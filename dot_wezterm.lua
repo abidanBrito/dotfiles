@@ -17,11 +17,11 @@ end
 wezterm.on('gui-startup', function()
   local tab, pane, window = mux.spawn_window({
       position = {
-        x = 340,
-        y = 200,
+        x = 380,
+        y = 220,
       },
       width = 85,
-      height = 16,
+      height = 20,
     })
 end)
 
@@ -41,7 +41,6 @@ config.max_fps = 120
 
 -- Hardware accelerated rasterization
 config.front_end = 'WebGpu'
--- config.front_end = 'OpenGL'
 config.prefer_egl = true
 config.webgpu_power_preference = 'HighPerformance'
 config.webgpu_force_fallback_adapter = false
@@ -52,8 +51,12 @@ config.webgpu_preferred_adapter = {
 }
 
 -- Default shell
--- config.default_prog = { "C:/Program Files/PowerShell/7/pwsh.exe", '-NoLogo' }
 config.default_prog = { "nu" }
+
+-- Environment variables
+config.set_environment_variables = { 
+  XDG_CONFIG_HOME = 'C:/Users/abi/.config'
+}
 
 -- Startup working directory & workspace
 config.default_cwd = 'D:/dev'
@@ -62,38 +65,8 @@ config.default_workspace = "main"
 --
 -- Look & feel
 --
-config.color_scheme = 'Classic Dark (base16)'
-config.line_height = 1.25
-
--- local colors = {
---   background = background,
---   cursor_bg = '#a9a1e1',
---   cursor_fg = background,
---   cursor_border = '#fb4934',
---   selection_fg = background,
---   selection_bg = '#fb4934',
---   quick_select_label_bg = { Color = '#60b5de' },
---   quick_select_label_fg = { Color = '#ffffff' },
---   quick_select_match_bg = { Color = '#c07d9e' },
---   quick_select_match_fg = { Color = '#ffffff' },
---   tab_bar = {
---     background = background,
---     inactive_tab_edge = 'rgba(28, 28, 28, 0.9)',
---     active_tab = {
---       bg_color = background,
---       fg_color = '#c0c0c0',
---     },
---     inactive_tab = {
---       bg_color = background,
---       fg_color = '#808080',
---     },
---     inactive_tab_hover = {
---       bg_color = background,
---       fg_color = '#808080',
---     },
---   },
--- }
-
+config.color_scheme = 'nord'
+config.line_height = 1
 
 -- Window
 config.window_decorations = 'RESIZE'
@@ -128,7 +101,7 @@ config.default_cursor_style = 'BlinkingBlock'
 config.cursor_blink_rate = 600
 
 -- Fonts
-config.font_size = 12
+config.font_size = 13
 config.font = wezterm.font_with_fallback {
   'Berkeley Mono',
   'ProggyVector',
@@ -151,12 +124,11 @@ end
 -- https://wezfurlong.org/wezterm/config/lua/window-events/format-tab-title.html
 function tab_title(tab_info)
   local title = tab_info.tab_title
-  -- if the tab title is explicitly set, take that
+  -- If the tab title is explicitly set, take that
   if title and #title > 0 then
     return title
   end
-  -- Otherwise, use the title from the active pane
-  -- in that tab
+  -- Otherwise, use the title from the active pane in that tab
   return tab_info.active_pane.title
 end
 
@@ -300,6 +272,7 @@ config.keys = my_keys
 return config
 
 
+
 -- -- Keys
 -- config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 1000 }
 -- config.keys = {
@@ -380,8 +353,6 @@ return config
 --     { key = "Enter",  action = "PopKeyTable" },
 --   }
 -- }
-
-
 
 -- config.leader = { key = 'RightAlt', mods = 'ALT'} -- wezterm --config debug_key_events=true
 
