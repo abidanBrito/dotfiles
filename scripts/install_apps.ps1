@@ -107,7 +107,7 @@ $apps = @(
     @{ name = "Figma.Figma" },                               # Figma
     @{ name = "darktable.darktable" },                       # Darktable
     @{ name = "OBSProject.OBSStudio" },                      # OBS Studio
-    @{ name = "OpenShot.OpenShot" },                         # OpenShot
+    # @{ name = "OpenShot.OpenShot" },                         # OpenShot
     @{ name = "Gyan.FFmpeg" },                               # FFmpeg
 );
 
