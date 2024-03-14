@@ -1,14 +1,10 @@
 format = """
-[](#4f4f4f)\
 $username\
-[](bg:#d86365 fg:#4f4f4f)\
+[|](fg:#d8dee9)\
 $directory\
-[](fg:#d86365 bg:#FCA17D)\
+[|](fg:#d8dee9)\
 $git_branch\
-$git_status\
-[](fg:#FCA17D bg:#86BBD8)\
-$docker_context\
-[ ](fg:#86BBD8)\
+[ ](fg:#d8dee9)\
 """
 
 # Disable the blank line at the start of the prompt
@@ -16,27 +12,18 @@ add_newline = false
 
 [username]
 show_always = true
-style_user = "bg:#4f4f4f"
-style_root = "bg:#4f4f4f"
+style_user = "fg:#b48ead"
+style_root = "fg:#b48ead"
 format = '[$user ]($style)'
 disabled = false
 
 [directory]
-style = "bg:#d86365"
+style = "fg:#8fbcbb"
 format = "[ $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
 [git_branch]
 symbol = ""
-style = "bg:#FCA17D"
+style = "fg:#ebcb8b"
 format = '[ $symbol $branch ]($style)'
-
-[git_status]
-style = "bg:#FCA17D"
-format = '[$all_status$ahead_behind ]($style)'
-
-[docker_context]
-symbol = " "
-style = "bg:#06969A"
-format = '[ $symbol $context ]($style) $path'
