@@ -6,9 +6,9 @@
 	user = abidanBrito
 
 [core]
-	autocrlf = input
-	safecrlf = true
 	editor = emacs
+	autocrlf = true
+	#safecrlf = true
 
 [protocol]
 	version = 2
