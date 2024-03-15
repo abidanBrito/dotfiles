@@ -76,6 +76,7 @@ $apps = @(
     @{ name = "MSYS2.MSYS2" },                               # MSYS2
     @{ name = "LLVM.LLVM" },                                 # LLVM
     @{ name = "ajeetdsouza.zoxide" },                        # zoxide
+    @{ name = "gokcehan.lf" },                               # lf
     @{ name = "eza-community.eza" },                         # eza
     @{ name = "sharkdp.bat" },                               # bat
     @{ name = "sharkdp.fd" },                                # fd
