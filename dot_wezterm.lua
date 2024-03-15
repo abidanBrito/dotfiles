@@ -40,15 +40,15 @@ config.canonicalize_pasted_newlines = 'None'
 config.max_fps = 120
 
 -- Hardware accelerated rasterization
-config.front_end = 'WebGpu'
+config.front_end = 'OpenGL'
 config.prefer_egl = true
-config.webgpu_power_preference = 'HighPerformance'
-config.webgpu_force_fallback_adapter = false
-config.webgpu_preferred_adapter = {
-  backend = 'Dx12',
-  device_type = 'DiscreteGpu',
-  name = 'NVIDIA GeForce GTX 1650 with Max-Q Design'
-}
+-- config.webgpu_force_fallback_adapter = false
+-- config.webgpu_power_preference = 'HighPerformance'
+-- config.webgpu_preferred_adapter = {
+--   backend = 'Dx12',
+--   device_type = 'DiscreteGpu',
+--   name = 'NVIDIA GeForce GTX 1650 with Max-Q Design'
+-- }
 
 -- Default shell
 config.default_prog = { "nu" }
@@ -70,7 +70,8 @@ config.line_height = 1
 
 -- Window
 config.window_decorations = 'RESIZE'
-config.window_background_opacity = 1
+config.window_background_opacity = 1.0
+-- config.win32_system_backdrop = 'Acrylic'
 
 config.window_frame = {
   border_left_width = '.25cell',
