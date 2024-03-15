@@ -1,0 +1,7 @@
+# Ignore repo specific files
+README.md
+LICENSE
+
+# Ignore configuration scripts
+scripts/
+scripts/**
