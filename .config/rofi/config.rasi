@@ -1,0 +1,100 @@
+// config.rasi 
+
+@import "catppuccin-mocha"
+
+configuration {
+    font: "FantasqueSansMono Nerd Font 16";
+    drun {
+        display-name: "";
+    }
+    run {
+        display-name: "";
+    }
+    window {
+        display-name: "";
+    }
+    timeout {
+        delay: 5;
+        action: "kb-cancel";
+    }
+}
+
+* {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+    background-color: @surface0;
+    text-color: @text;
+}
+
+window {
+    background-color: transparent;
+    border: none;
+    width: 24em;
+    height: 12em;
+}
+
+mainbox {
+    border-color: @surface1;
+    border-radius: 15;
+    border: 2px solid;
+    padding: 10px;
+    children: [inputbar, listview];
+}
+
+listview {
+    scrollbar: false;
+    border: none;
+    spacing: 0;
+    lines: 8;
+}
+
+inputbar {
+    background-color: @surface1;
+    border-radius: 10px;
+    margin: 0 0 10px 0;
+    children: [prompt, entry];
+}
+
+prompt {
+    background-color: inherit;
+    color: @peach;
+    padding: 10px 10px;
+    enabled: true;
+}
+
+entry {
+    background-color: inherit;
+    color: @lavender;
+    padding: 10px 10px;
+    blink: false;
+}
+
+element {
+    background-color: transparent;
+    text-color: @overlay2;
+    border-radius: 10px;
+    children: [element-icon, element-text];
+}
+
+element alternate normal,
+element normal normal {
+    background-color: inherit;
+    text-color: @inherit;
+}
+
+element selected normal {
+    background-color: inherit;
+    text-color: @peach;
+    border-color: @peach;
+    border: 2px solid;
+}
+
+element-icon {
+    padding: 10px 10px;
+}
+
+element-text {
+    padding: 10px 0;
+}
