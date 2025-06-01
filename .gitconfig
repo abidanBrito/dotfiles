@@ -1,0 +1,87 @@
+[user]
+	name = Abidan Brito
+	email = 43681148+abidanBrito@users.noreply.github.com
+
+[github]
+  user = abidanBrito
+
+[init]
+  defaultBranch = main
+
+[core]
+	editor = vim
+	autocrlf = false
+
+[protocol]
+  version = 2
+
+[status]
+	short = true
+
+[help]
+	autocorrect = 1
+
+[fetch]
+	prune = true
+
+[push]
+	default = simple
+
+[pull]
+	ff = only
+
+[diff]
+	algorithm = histogram
+	indentHeuristic = true
+
+[ui "color"]
+	ui = always
+
+[color]
+  ui = true
+
+[url "git@github.com:"]
+	insteadOf = gh:
+
+[url "https://gist.github.com/"]
+  insteadOf = gist:
+
+[filter "lfs"]
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+
+[alias]
+	# Staging & commits
+	a = add
+	c = commit
+	s = status
+	save = !git add -A && git commit -m 'chore: save point'
+
+	# Upstream
+  p = !git push origin HEAD
+	pf = push --force-with-lease
+
+	# Undo stuff
+  res = !git reset --hard
+	undo = reset HEAD~1 --mixed
+
+	# Log
+	l = log --oneline
+	lg = !git log --pretty=format:\"%C(yellow) %h%Creset -%C(red)%d%Creset %s %C(magenta)(%cr) [%an]\" --abbrev-commit
+	last = log -1 HEAD
+	graph = log --oneline --graph --decorate
+	
+	# Branches
+	co = checkout
+	cob = checkout -b
+	br = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:magenta)(%(committerdate:relative)) [%(authorname)]' --sort=-committerdate
+	del = branch -D
+
+	# Stash
+	st = stash push
+	sp = stash pop
+	sl = stash list
+	ss = stash show
+	sa = stash apply
