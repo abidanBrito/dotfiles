@@ -1,0 +1,10 @@
+# .shell_env
+
+### Tooling configuration
+export EDITOR='emacsclient -c -a ""'
+export FZF_DEFAULT_OPTS="--height=100% --preview '~/.config/fzf/preview.sh {}' --preview-window=right:60%:wrap"
+export BAT_THEME="Nord"
+
+### Development
+# Initialize miniconda (Python)
+[ -f /opt/miniconda3/etc/profile.d/conda.sh ] && source /opt/miniconda3/etc/profile.d/conda.sh

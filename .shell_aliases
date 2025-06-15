@@ -1,0 +1,45 @@
+# .shell_aliases
+
+# Directory listing
+alias ls='eza --group-directories-first --icons'
+alias lsa='eza --group-directories-first --all --icons'
+alias ll='eza --long --git --header --icons'
+alias lla='eza --long --git --header --all --icons'
+alias tree='eza --tree --level=2 --icons'
+
+# Quick navigation
+alias ~='cd ~'
+alias -- -='cd -'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+
+# Search & text processing (grep variants)
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+alias rgi='rg --smart-case'
+
+# Editors & modern tool replacements
+alias em='emacsclient -c -a ""'
+alias emt='emacsclient -t -a ""'
+alias vim='nvim'
+alias cat='bat'
+alias lg='lazygit'
+
+# Safety nets, always prompt before overwriting or deleting data
+alias cp='cp -i'
+alias mv='mv -i'
+alias rm='rm -i'
+
+# Session management
+alias r='source ~/.zshrc || source ~/.bashrc'
+alias h='history'
+alias hg='history | grep -i'
+alias c='clear'
+alias q='exit'
+
+# Process control
+alias k='kill -15'
+alias k9='kill -9'
+alias psg='ps aux | grep -i'

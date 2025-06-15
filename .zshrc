@@ -1,10 +1,26 @@
 # .zshrc
 
+# Auto-start hyprland on TTY1 if no display server is running
 if [[ -z $DISPLAY ]] && [[ $(tty) == "/dev/tty1" ]]; then
-	exec hyprland
+    exec hyprland
 fi
 
-export EDITOR='nvim'
+# Early exit for non-interactive shells
+[[ -o interactive ]] || return
+
+# Load environment variables
+if [[ -f ~/.shell_env ]]; then
+    source ~/.shell_env || echo "WARNING: failed to load ~/.shell_env" >&2
+else
+    echo "WARNING: ~/.shell_env not found" >&2
+fi
+
+# Load aliases
+if [[ -f ~/.shell_aliases ]]; then
+    source ~/.shell_aliases || echo "WARNING: failed to load ~/.shell_aliases" >&2
+else
+    echo "WARNING: ~/.shell_aliases not found" >&2
+fi
 
 ### Plugins
 # Set where to store zinit and plugins
@@ -12,8 +28,8 @@ ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
 
 # Download zinit, if it doesn't exist
 if [ ! -d "$ZINIT_HOME" ]; then
-  mkdir -p "$(dirname $ZINIT_HOME)"
-  git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+    mkdir -p "$(dirname $ZINIT_HOME)"
+    git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
 fi
 
 # Load zinit
@@ -42,8 +58,8 @@ bindkey '^n' history-search-forward
 bindkey "^[[3~" delete-char
 
 ### History
-HISTSIZE=3000
 HISTFILE=~/.zsh_history
+HISTSIZE=3000
 SAVEHIST=$HISTSIZE
 HISTDUP=erase
 
@@ -82,21 +98,7 @@ zstyle ':completion:*' menu no
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --icons $realpath'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --icons $realpath'
 
-### Aliases
-alias ls='eza --icons'
-alias tree='eza --tree --icons'
-alias cat='bat'
-alias vim='nvim'
-alias lg='lazygit'
-
 ### Shell integrations
-eval "$(starship init zsh)"
-eval "$(zoxide init --cmd cd zsh)"
-eval "$(fzf --zsh)"
-
-# Miniconda
-[ -f /opt/miniconda3/etc/profile.d/conda.sh ] && source /opt/miniconda3/etc/profile.d/conda.sh
-
-# FZF options
-export FZF_DEFAULT_OPTS="--height=100% --preview '~/.config/fzf/preview.sh {}' --preview-window=right:60%:wrap"
-
+command -v starship &> /dev/null && eval "$(starship init zsh)"
+command -v zoxide &> /dev/null && eval "$(zoxide init --cmd cd zsh)"
+command -v fzf &> /dev/null && eval "$(fzf --zsh)"

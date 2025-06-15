@@ -1,24 +1,36 @@
-# ~/.bashrc
+# .bashrc
 
-# If not running interactively, don't do anything
+# Early exit for non-interactive shells
 [[ $- != *i* ]] && return
 
-alias ls='ls --color=auto'
-alias grep='grep --color=auto'
-PS1='[\u@\h \W]\$ '
-
-# >>> conda initialize >>>
-# !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/opt/miniconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
+# Load environment variables
+if [ -f ~/.shell_env ]; then
+    source ~/.shell_env || echo "WARNING: failed to load ~/.shell_env" >&2
 else
-    if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/opt/miniconda3/etc/profile.d/conda.sh"
-    else
-        export PATH="/opt/miniconda3/bin:$PATH"
-    fi
+    echo "WARNING: ~/.shell_env not found" >&2
 fi
-unset __conda_setup
-# <<< conda initialize <<<
 
+# Load aliases
+if [ -f ~/.shell_aliases ]; then
+    source ~/.shell_aliases || echo "WARNING: failed to load ~/.shell_aliases" >&2
+else
+    echo "WARNING: ~/.shell_aliases not found" >&2
+fi
+
+# Better prompt
+PS1='\[\033[01;32m\]\u@\h\[\033[00m\] \[\033[01;34m\]\w\[\033[00m\] ❯ '
+
+### History settings
+HISTFILE=~/.bash_history
+HISTSIZE=3000
+HISTFILESIZE=$HISTSIZE
+
+# Ignore duplicates and space-prefixed commands
+HISTCONTROL=ignoredups:erasedups:ignorespace
+
+# Append to history file
+shopt -s histappend
+
+### Shell integrations
+command -v zoxide &> /dev/null && eval "$(zoxide init --cmd cd bash)"
+command -v fzf &> /dev/null && eval "$(fzf --bash)"
