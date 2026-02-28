@@ -23,7 +23,7 @@ wezterm.on('gui-startup', function()
       },
       width = 85,
       height = 20,
-    })
+  })
 end)
 
 --
@@ -65,11 +65,11 @@ config.default_cwd = home .. '/dev'
 -- Look & feel
 --
 config.color_scheme = 'Catppuccin Mocha'
-config.line_height = 1.1
+config.line_height = 1.2
 
 -- Window
 config.window_decorations = 'RESIZE'
-config.window_background_opacity = 0.95
+config.window_background_opacity = 0.9
 config.window_padding = {
   left = '1.3cell',
   right = '1.3cell',
@@ -84,19 +84,19 @@ config.inactive_pane_hsb = {
 }
 
 -- Cursor
-config.default_cursor_style = 'SteadyBar'
+config.default_cursor_style = 'SteadyBlock'
 
 -- Fonts
-config.font_size = 10
 config.font = wezterm.font_with_fallback {
-	{ family='CaskaydiaCove Nerd Font', weight='DemiLight', scale = 1.3 },
-  { family = "Symbols Nerd Font Mono", scale = 1.3 }
+    { family='CaskaydiaCove Nerd Font', weight='Regular', scale = 1.0 },
+    { family = "Symbols Nerd Font Mono", scale = 1.0 }
 }
+config.font_size = 13
+config.cell_width = 1.05
 config.use_cap_height_to_scale_fallback_fonts = false
 config.freetype_load_target = 'Light'
 config.freetype_render_target = 'HorizontalLcd'
 config.freetype_load_flags = 'DEFAULT'
-config.cell_width = 1.1
 
 -- Tab bar
 config.enable_tab_bar = true
@@ -111,13 +111,6 @@ end
 
 -- https://wezfurlong.org/wezterm/config/lua/window-events/format-tab-title.html
 function tab_title(tab_info)
-  -- local title = tab_info.tab_title
-  -- -- If the tab title is explicitly set, take that
-  -- if title and #title > 0 then
-    -- return title
-  -- end
-  -- -- Otherwise, use the title from the active pane in that tab
-  -- return tab_info.active_pane.title
   return tostring(tab_info.tab_index + 1)
 end
 
@@ -158,18 +151,7 @@ wezterm.on(
 wezterm.on('update-right-status', function(window, pane)
   -- Workspace
   local ws = window:active_workspace()
-  --   -- It's a little silly to have workspace name all the time
-  --   -- Utilize this to display LDR or current key table name
-  --   if window:active_key_table() then
-  --     stat = window:active_key_table()
-  --     stat_color = "#7dcfff"
-  --   end
-
-  --   if window:leader_is_active() then
-  --     stat = "LDR"
-  --     stat_color = "#bb9af7"
-  --   end
-
+  
   -- Current process
   -- TODO(abi): fix string / nil issue, check debug overlay...
   local fg_process = basename(pane:get_foreground_process_name())
@@ -188,7 +170,7 @@ end)
 --
 config.default_domain = 'local'
 config.wsl_domains = {
-  {
+    {
     name = 'WSL:udev',
     distribution = 'udev',
     username = "abi",
@@ -203,23 +185,24 @@ config.wsl_domains = {
 local my_keys = {}
 
 -- Tabs
-table.insert(my_keys, { key = 'n', mods = 'ALT', action = act({ SpawnTab = 'CurrentPaneDomain' }) })
+table.insert(my_keys, { key = 't', mods = 'CTRL', action = act({ SpawnTab = 'CurrentPaneDomain' }) })
+table.insert(my_keys, { key = 'w', mods = 'CTRL', action = act.CloseCurrentTab { confirm = false } })
 
-table.insert(my_keys, { key = 'i', mods = 'ALT', action = act.MoveTabRelative(1) })
-table.insert(my_keys, { key = 'u', mods = 'ALT', action = act.MoveTabRelative(-1) })
+table.insert(my_keys, { key = 'n', mods = 'CTRL|SHIFT', action = act.MoveTabRelative(1) })
+table.insert(my_keys, { key = 'p', mods = 'CTRL|SHIFT', action = act.MoveTabRelative(-1) })
 
 for i = 1, 8 do
   table.insert(my_keys, { key = tostring(i), mods = 'ALT', action = act({ ActivateTab = i - 1 }), })
 end
 
 -- Panes
-table.insert(my_keys, { key = 'v', mods = 'SHIFT|ALT', action = act({ SplitHorizontal = { domain = 'CurrentPaneDomain'} }) })
-table.insert(my_keys, { key = 'h', mods = 'SHIFT|ALT', action = act({ SplitVertical = { domain = 'CurrentPaneDomain' } }) })
+table.insert(my_keys, { key = 'i', mods = 'ALT', action = act({ SplitVertical = { domain = 'CurrentPaneDomain' } }) })
+table.insert(my_keys, { key = 'o', mods = 'ALT', action = act({ SplitHorizontal = { domain = 'CurrentPaneDomain'} }) })
 
-table.insert(my_keys, { key = 'h', mods = 'ALT', action = act({ ActivatePaneDirection = 'Left' }) })
-table.insert(my_keys, { key = 'j', mods = 'ALT', action = act({ ActivatePaneDirection = 'Down' }) })
-table.insert(my_keys, { key = 'k', mods = 'ALT', action = act({ ActivatePaneDirection = 'Up' }) })
-table.insert(my_keys, { key = 'l', mods = 'ALT', action = act({ ActivatePaneDirection = 'Right' }) })
+table.insert(my_keys, { key = 'h', mods = 'ALT|SHIFT', action = act({ ActivatePaneDirection = 'Left' }) })
+table.insert(my_keys, { key = 'j', mods = 'ALT|SHIFT', action = act({ ActivatePaneDirection = 'Down' }) })
+table.insert(my_keys, { key = 'k', mods = 'ALT|SHIFT', action = act({ ActivatePaneDirection = 'Up' }) })
+table.insert(my_keys, { key = 'l', mods = 'ALT|SHIFT', action = act({ ActivatePaneDirection = 'Right' }) })
 
 table.insert(my_keys, { key = 'h', mods = 'CTRL|ALT', action = act.AdjustPaneSize { 'Left', 1 } })
 table.insert(my_keys, { key = 'j', mods = 'CTRL|ALT', action = act.AdjustPaneSize { 'Down', 1 } })
@@ -232,7 +215,7 @@ table.insert(my_keys, { key = 'q', mods = 'ALT', action = act.QuickSelect })
 table.insert(my_keys, { key = 'l', mods ='ALT', action = act.QuickSelectArgs { patterns = { "^.+$" } , } , })
 table.insert(my_keys, { key = 's', mods = 'ALT', action = act.Search { CaseSensitiveString = '' } })
 
-table.insert(my_keys, { key = 'z', mods = 'CTRL|SHIFT', action = act.TogglePaneZoomState })
+table.insert(my_keys, { key = 'n', mods = 'ALT', action = act.TogglePaneZoomState })
 table.insert(my_keys, { key = 'p', mods = 'CTRL|SHIFT', action = act.ActivateCommandPalette })
 table.insert(my_keys, { key = 't', mods = 'CTRL|SHIFT', action = act.ShowTabNavigator })
 table.insert(my_keys, { key = 'l', mods = 'CTRL|SHIFT', action = act.ShowLauncher })
