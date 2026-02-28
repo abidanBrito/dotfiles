@@ -27,12 +27,14 @@ sudo pacman -S --needed \
     libwebp \
     giflib \
     libxpm \
+    librsvg \
     ncurses \
     gtk3 \
     imagemagick \
     glib2 \
     libxml2 \
-    cairo \
+    sqlite \
+    cairo
 
 # Get Wayland-specific dependencies.
 sudo pacman -S --needed \
@@ -40,7 +42,7 @@ sudo pacman -S --needed \
     wayland-protocols \
     gtk-layer-shell
 
-# Get dependencies for gcc-10 and the build process.
+# Get dependencies for gcc and the build process.
 sudo pacman -S --needed \
     gcc \
     libgccjit \
@@ -92,18 +94,26 @@ export CC=/usr/bin/gcc CXX=/usr/bin/g++
 # https://lemire.me/blog/2018/07/25/it-is-more-complicated-than-i-thought-mtune-march-in-gcc/
 ./autogen.sh \
     && ./configure \
-    --with-native-compilation=yes \
+    --with-native-compilation \
     --with-pgtk \
     --with-wayland \
     --with-tree-sitter \
     --with-json \
+    --with-sqlite3 \
+    --with-harfbuzz \
     --with-wide-int \
     --with-modules \
     --without-dbus \
     --with-gnutls \
     --with-mailutils \
+    --with-xml2 \
     --without-pop \
     --with-cairo \
+    --with-jpeg \
+    --with-png \
+    --with-tiff \
+    --with-gif \
+    --with-rsvg \
     --with-imagemagick \
     CFLAGS="-O2 -pipe -mtune=native -march=native -fomit-frame-pointer"
 
