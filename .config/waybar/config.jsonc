@@ -1,80 +1,85 @@
 // config.jsonc
 
 {
-  "layer": "top",
-  "position": "top",
-  "margin-top": 4,
-  "margin-left": 4,
-  "margin-right": 4,
-  "modules-left": ["custom/weather", "hyprland/workspaces"],
-  "modules-center": ["hyprland/window"],
-  "modules-right": ["clock", "battery", "pulseaudio", "network"],
+    "layer": "top",
+    "position": "top",
+    "margin-top": 4,
+    "margin-left": 4,
+    "margin-right": 4,
+    "modules-left": ["custom/weather", "hyprland/workspaces"],
+    "modules-center": ["hyprland/window"],
+    "modules-right": ["tray", "clock", "battery", "pulseaudio", "network"],
 
-  "custom/weather": {
-    "exec": "~/.scripts/weather.sh Puerto+del+Rosario+Spain",
-    "return-type": "json",
-    "format": "{}",
-    "tooltip": true,
-    "interval": 1800
-  },
-
-  "hyprland/window": {
-    "format": "{title}",
-    "icon": true,
-    "icon-size": 20,
-    "max-length": 50
-  },
-
-  "clock": {
-    "format": "󰥔 {:%I:%H}",
-    "format-alt": "󰥔 {:%d %b - %I:%H}",
-    "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
-    "calendar": {
-      "mode": "month",
-      "format": {
-            "months": "",
-            "weekdays": "<b>{}</b>",
-            "days": "<b>{}</b>",
-            "today": "<span color='#ffcc66'><b>{}</b></span>"
-      }
-    }
-  },
-
-  "battery": {
-    "states": {
-      "warning": 30,
-      "critical": 15
+    "custom/weather": {
+	"exec": "~/.scripts/weather.sh Puerto+del+Rosario+Spain",
+	"return-type": "json",
+	"format": "{}",
+	"tooltip": true,
+	"interval": 1800
     },
-    "format": "{icon} {capacity}%",
-    "format-alt": "{icon} {time}",
-    "format-charging": "󰂄 {capacity}%",
-    "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
-    "tooltip-format": "{time}"
-  },
 
-  "network": {
-    "format-alt": "{icon} {ipaddr}/{cidr}",
-    "format-wifi": "{icon} {essid}",
-    "format-ethernet": "{icon} Online",
-    "format-disconnected": "{icon} Offline",
-    "format-icons": {
-      "wifi": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
-      "ethernet": "󰈀",
-      "disconnected": "󰤭"
+    "hyprland/window": {
+	"format": "{title}",
+	"icon": true,
+	"icon-size": 20,
+	"max-length": 50
     },
-    "tooltip-format": "{ifname}",
-    "max-length": 50
-  },
 
-  "pulseaudio": {
-      "format": "{icon} {volume}%",
-      "format-muted": " {volume}%",
-      "format-bluetooth": "󰂱 {volume}%",
-      "format-icons": {
-        "default": ""
-      },
-      "ignored-sinks": ["Easy Effects Sink"],
-      "on-click": "pavucontrol",
-      "scroll-step": 1
-  }
+    "tray": {
+	"icon-size": 20,
+	"spacing": 10
+    },
+
+    "clock": {
+	"format": "󰥔 {:%I:%H}",
+	"format-alt": "󰥔 {:%d %b - %I:%H}",
+	"tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+	"calendar": {
+	    "mode": "month",
+	    "format": {
+		"months": "",
+		"weekdays": "<b>{}</b>",
+		"days": "<b>{}</b>",
+		"today": "<span color='#ffcc66'><b>{}</b></span>"
+	    }
+	}
+    },
+
+    "battery": {
+	"states": {
+	    "warning": 30,
+	    "critical": 15
+	},
+	"format": "{icon} {capacity}%",
+	"format-alt": "{icon} {time}",
+	"format-charging": "󰂄 {capacity}%",
+	"format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+	"tooltip-format": "{time}"
+    },
+
+    "network": {
+	"format-alt": "{icon} {ipaddr}/{cidr}",
+	"format-wifi": "{icon} {essid}",
+	"format-ethernet": "{icon} Online",
+	"format-disconnected": "{icon} Offline",
+	"format-icons": {
+	    "wifi": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
+	    "ethernet": "󰈀",
+	    "disconnected": "󰤭"
+	},
+	"tooltip-format": "{ifname}",
+	"max-length": 50
+    },
+
+    "pulseaudio": {
+	"format": "{icon} {volume}%",
+	"format-muted": " {volume}%",
+	"format-bluetooth": "󰂱 {volume}%",
+	"format-icons": {
+	    "default": ""
+	},
+	"ignored-sinks": ["Easy Effects Sink"],
+	"on-click": "pavucontrol",
+	"scroll-step": 1
+    },
 }

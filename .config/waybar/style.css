@@ -30,6 +30,7 @@
     color: @peach;
 }
 
+#tray,
 #clock,
 #battery,
 #pulseaudio,
@@ -38,6 +39,10 @@
     background-color: @surface1;
     padding: 0 0.5rem;
     margin: 0.5rem;
+}
+
+#tray {
+    border-radius: 0.5rem;
 }
 
 #clock {
@@ -52,13 +57,13 @@
     margin: 0.5rem 0;
     padding-right: 1rem;
 }
-  
+
 #battery.charging {
-color: @green;
+    color: @green;
 }
 
 #battery.warning:not(.charging) {
-color: @red;
+    color: @red;
 }
 
 #pulseaudio {
