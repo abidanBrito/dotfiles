@@ -1,8 +1,8 @@
 # .zshrc
 
 # Auto-start hyprland on TTY1 if no display server is running
-if [[ -z $DISPLAY ]] && [[ $(tty) == "/dev/tty1" ]]; then
-    exec hyprland
+if [[ -z $WAYLAND_DISPLAY ]] && [[ $(tty) == "/dev/tty1" ]]; then
+    exec start-hyprland
 fi
 
 # Early exit for non-interactive shells
@@ -99,6 +99,9 @@ zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza --icons $realpath'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --icons $realpath'
 
 ### Shell integrations
-command -v starship &> /dev/null && eval "$(starship init zsh)"
+if [[ "$TERM" != "dumb" ]] && command -v starship &> /dev/null; then
+    eval "$(starship init zsh)"
+fi
 command -v zoxide &> /dev/null && eval "$(zoxide init --cmd cd zsh)"
 command -v fzf &> /dev/null && eval "$(fzf --zsh)"
+command -v uv &> /dev/null && eval "$(uv generate-shell-completion zsh)"
