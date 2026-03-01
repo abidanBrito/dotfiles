@@ -1,0 +1,3727 @@
+#+TITLE: Abi's Emacs Config
+#+AUTHOR: Abidán Brito
+#+DESCRIPTION: Personal GNU Emacs configuration.
+#+PROPERTY: header-args:emacs-lisp :tangle yes
+#+STARTUP: show2levels
+
+* FILE HEADERS
+** Header for ~.early-init.el~
+#+begin_src emacs-lisp :tangle ./early-init.el
+  ;;; early-init.el --- Abi's GNU Emacs configuration -*- lexical-binding: t -*-
+
+  ;; Copyright (C) 2025 Abidán Brito
+
+  ;; Author: Abidán Brito <abidan.brito@gmail.com>
+  ;; Maintainer: Abidán Brito <abidan.brito@gmail.com>
+  ;; Created: 2025
+  ;; Homepage: https://github.com/abidanBrito/dotfiles
+
+  ;;; License:
+
+  ;; This file is NOT part of GNU Emacs.
+
+  ;; This program is free software: you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation, either version 3 of the License, or
+  ;; (at your option) any later version.
+
+  ;; This program is distributed in the hope that it will be useful,
+  ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ;; GNU General Public License for more details.
+
+  ;; You should have received a copy of the GNU General Public License
+  ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+  ;;; Commentary:
+
+  ;; This is my personal configuration layer for GNU Emacs.
+  ;; I'm still getting acquainted with Emacs and the defaults I have set up
+  ;; are those which work best for me. If you're looking for best practices
+  ;; or an unopinionated configuration, I'd recommend to look elsewhere.
+
+  ;;; Code:
+#+end_src
+
+** Header for ~.config.el~
+#+begin_src emacs-lisp
+  ;;; config.el --- Abi's GNU Emacs configuration -*- lexical-binding: t no-byte-compile: t -*-
+
+  ;; Copyright (C) 2025 Abidán Brito
+
+  ;; Author: Abidán Brito <abidan.brito@gmail.com>
+  ;; Maintainer: Abidán Brito <abidan.brito@gmail.com>
+  ;; Created: 2025
+  ;; Homepage: https://github.com/abidanBrito/dotfiles
+
+  ;;; License:
+
+  ;; This file is NOT part of GNU Emacs.
+
+  ;; This program is free software: you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation, either version 3 of the License, or
+  ;; (at your option) any later version.
+
+  ;; This program is distributed in the hope that it will be useful,
+  ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ;; GNU General Public License for more details.
+
+  ;; You should have received a copy of the GNU General Public License
+  ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+  ;;; Commentary:
+
+  ;; This is my personal configuration layer for GNU Emacs.
+  ;; I'm still getting acquainted with Emacs and the defaults I have set up
+  ;; are those which work best for me.  If you're looking for best practices
+  ;; or an unopinionated configuration, I'd recommend to look elsewhere.
+
+  ;;; Code:
+#+end_src
+
+* STARTUP PRIORITY SETTINGS
+** TODO Garbage collection
+PERF(abi): decrease load and compile time by minimizing GC during startup. We set a very high threshold. This shall be restored later on to a more sensible value, either manually or by =gcmh=.
+#+begin_src emacs-lisp :tangle no
+  (setq gc-cons-threshold most-positive-fixnum)
+
+  ;; Restore after startup
+  (defvar default-file-name-handler-alist file-name-handler-alist)
+  (setq file-name-handler-alist nil)
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              "Restore default values after init."
+              (setq file-name-handler-alist default-file-name-handler-alist)
+              (setq gc-cons-threshold 800000)
+              (if (boundp 'after-focus-change-function)
+                  (add-function :after after-focus-change-function
+                                (lambda ()
+                                  (unless (frame-focus-state)
+                                    (garbage-collect))))
+                (add-hook 'focus-out-hook #'garbage-collect))))
+#+end_src
+
+** Optimizations
+A bunch of micro-optimizations that have to do with package loading, rendering, file I/O and networking.
+#+begin_src emacs-lisp :tangle ./early-init.el
+  ;; Prevent `package.el' from loading packages prior to the init-file.
+  (setq package-enable-at-startup nil)
+
+  ;; Disable bidirectional text rendering.
+  (setq-default bidi-display-reordering 'left-to-right
+                bidi-paragraph-direction 'left-to-right)
+
+  ;; No need to render cursors and regions in non-focused windows.
+  (setq-default cursor-in-non-selected-windows nil
+                highlight-nonselected-windows nil)
+
+  ;; Don't fontify over unfontified regions.
+  (setq fast-but-imprecise-scrolling t
+        jit-lock-defer-time 0)
+
+  ;; No expensive frame resizing due to fonts larger/smaller than the system default,
+  ;; which can severely affect startup time.
+  (setq frame-inhibit-implied-resize t)
+
+  ;; No font compacting (terribly expensive for rendering icon fonts on Windows).
+  (setq inhibit-compacting-font-caches t)
+
+  ;; Reduce workload when doing file I/0.
+  (setq w32-get-true-file-attributes nil)
+
+  ;; Don't ping hostnames with known domains.
+  (setq ffap-machine-p-known 'reject)
+
+  ;; Don't trigger `line-move-partial` when calling `next-line`.
+  (setq auto-window-vscroll nil)
+
+  ;; NOTE(abi): this supposedly prevents some frame flickering edge cases.
+  (add-to-list 'default-frame-alist '(inhibit-double-buffering . t))
+#+end_src
+
+** Keep directories clean
+Place =native compilation cache= files into their own directory under =user-emacs-directory=.
+#+begin_src emacs-lisp :tangle ./early-init.el
+  (when (fboundp 'startup-redirect-eln-cache)
+    (startup-redirect-eln-cache
+     (convert-standard-filename
+      (expand-file-name "var/eln-cache/" user-emacs-directory))))
+#+end_src
+
+Place =backup= files into their own directory under =user-emacs-directory=.
+#+begin_src emacs-lisp :tangle ./early-init.el
+  (setq backup-directory-alist
+        `(("." . ,(expand-file-name "var/backup/" user-emacs-directory))))
+  (setq kept-new-versions 4
+        kept-old-versions 2
+        delete-old-versions t)
+#+end_src
+
+Place =auto-save= files into their own directory under =user-emacs-directory=.
+#+begin_src emacs-lisp :tangle ./early-init.el
+  (setq auto-save-file-name-transforms
+        `((".*" ,(expand-file-name "var/auto-save/" user-emacs-directory) t)))
+#+end_src
+
+** Use =plists= for deserialization
+NOTE(abi): this is recommended by the LSP documentation for a performance gain.
+#+begin_src emacs-lisp :tangle ./early-init.el
+  (setenv "LSP_USE_PLISTS" "true")
+#+end_src
+
+* PERSONAL INFORMATION
+Name and email address.
+#+begin_src emacs-lisp
+  (setq user-full-name "Abidán Brito Clavijo"
+        user-mail-address "abidan.brito@gmail.com")
+#+end_src
+
+* PACKAGE MANAGEMENT
+** Repositories
+NOTE(abi): it used to be the case that we had to handle no-TLS/SSL-less binaries and explicitly load and initialize the package system. The =MELPA= package archive also used to be less trusted by default.
+#+begin_src emacs-lisp :tangle no
+  (require 'package)
+  (let* ((no-ssl (and (memq system-type '(windows-nt ms-dos))
+                      (not (gnutls-available-p))))
+         (proto (if no-ssl "http" "https")))
+    (when no-ssl
+      (warn "\
+          Your version of Emacs does not support SSL connections. Please, install an Emacs version that
+          does support SSL to avoid MITM attacks."))
+    (add-to-list 'package-archives (cons "melpa-stable" (concat proto "://stable.melpa.org/packages/")) t)
+    (add-to-list 'package-archives
+                 '("melpa" . "https://melpa.org/packages/")))
+  (when (< emacs-major-version 24)
+    (add-to-list 'package-archives (cons "gnu" (concat proto "://elpa.gnu.org/packages/")))))
+  (package-initialize)
+#+end_src
+
+#+begin_src emacs-lisp
+  (setq package-archives
+        '(("melpa"        . "https://melpa.org/packages/")
+          ("melpa-stable" . "https://stable.melpa.org/packages/")
+          ("gnu"          . "https://elpa.gnu.org/packages/")
+          ("nongnu"       . "https://elpa.nongnu.org/nongnu/")))
+#+end_src
+
+** Package manager
+I like to use =straight= as my package manager. Not only does it integrate nicely with =use-package= and =general= but it also supports retrieving packages from online Git repositories that are not on MELPA or ELPA.
+#+begin_src emacs-lisp
+  ;; Run straight's bootstrap script
+  (defvar bootstrap-version)
+  (setq straight-vc-git-default-clone-depth 1)
+
+  (let ((bootstrap-file
+         (expand-file-name
+          "straight/repos/straight.el/bootstrap.el"
+          (or (bound-and-true-p straight-base-dir)
+              user-emacs-directory)))
+        (bootstrap-version 7))
+    (unless (file-exists-p bootstrap-file)
+      (with-current-buffer
+          (url-retrieve-synchronously
+           "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+           'silent 'inhibit-cookies)
+        (goto-char (point-max))
+        (eval-print-last-sexp)))
+    (load bootstrap-file nil 'nomessage))
+
+  ;; NOTE(abi): in case we want to fork some packages.
+  (setq straight-host-usernames
+        '((github . "abidanBrito")))
+
+  (setq straight-use-package-by-default t)
+#+end_src
+
+#+begin_src emacs-lisp
+  (straight-use-package 'org)
+#+end_src
+
+** Configuration
+While =use-package= is not an actual package manager, it simplifies the configuration and (lazy) loading of packages massively, through macro declarations.
+#+begin_src emacs-lisp
+  ;; NOTE(abi): `use-package' is now built-in, but we'll
+  ;; keep this around just in case we happen to use an older
+  ;; version. That said, this configuration has not been tested
+  ;; for versions lower than 29.2.50, so while this should work,
+  ;; there are no guarantees it'll break elsewhere.
+  (unless (package-installed-p 'use-package)
+    (package-refresh-contents)
+    (package-install 'use-package))
+
+  ;; Since `use-package' is no longer needed at runtime, we can
+  ;; reduce load time by requiring it early.
+  (eval-when-compile
+    (require 'use-package))
+  (require 'bind-key)
+
+  ;; Ensure packages by default.
+  ;; IMPORTANT(abi): use ':straight (:type built-in)' or both ':ensure nil' and ':straight nil' for built-in packages.
+  (setq use-package-always-ensure t)
+#+end_src
+
+** Local packages
+#+begin_src emacs-lisp :tangle no
+  (setq local-packages-directory
+        (expand-file-name "3rd/" user-emacs-directory))
+#+end_src
+
+* TODO GARBAGE COLLECTION
+Perform gargabe collection during idle time.
+TODO(abi): replace this with ~idle-gc~ when it's ready!
+#+begin_src emacs-lisp
+  (use-package gcmh
+    :demand t
+    :config
+    (setq gcmh-low-cons-threshold (* 16 1024 1024)
+          gcmh-idle-delay 5
+          gcmh-verbose nil)
+    (gcmh-mode))
+#+end_src
+
+* NATIVE COMPILATION
+#+begin_src emacs-lisp
+  (when (and (fboundp 'native-comp-available-p) (native-comp-available-p))
+    (progn
+      (setq native-comp-jit-compilation t
+            native-comp-speed 3
+            package-native-compile t)
+      (add-to-list 'native-comp-eln-load-path
+                   (expand-file-name "eln-cache/" user-emacs-directory))))
+#+end_src
+
+NOTE(abi): with the above configuration there should be no need to call this anymore, as new packages get natively compiled upon installation.
+#+begin_src emacs-lisp :tangle no
+  (native-compile-async user-emacs-directory 'recursively)
+#+end_src
+
+* LSP BOOSTER
+PERF(abi): multithreaded rust wrapper executable around lsp. It converts JSON message to elisp bytecode.
+#+begin_src emacs-lisp
+  (defun lsp-booster--advice-json-parse (old-fn &rest args)
+    "Try to parse bytecode instead of json."
+    (or
+     (when (equal (following-char) ?#)
+       (let ((bytecode (read (current-buffer))))
+         (when (byte-code-function-p bytecode)
+           (funcall bytecode))))
+     (apply old-fn args)))
+  (advice-add (if (progn (require 'json)
+                         (fboundp 'json-parse-buffer))
+                  'json-parse-buffer
+                'json-read)
+              :around
+              #'lsp-booster--advice-json-parse)
+
+  (defun lsp-booster--advice-final-command (old-fn cmd &optional test?)
+    "Prepend emacs-lsp-booster command to lsp CMD."
+    (let ((orig-result (funcall old-fn cmd test?)))
+      (if (and (not test?)                             ;; for check lsp-server-present?
+               (not (file-remote-p default-directory)) ;; see lsp-resolve-final-command, it would add extra shell wrapper
+               lsp-use-plists
+               (not (functionp 'json-rpc-connection))  ;; native json-rpc
+               (executable-find "emacs-lsp-booster"))
+          (progn
+            (when-let ((command-from-exec-path (executable-find (car orig-result))))  ;; resolve command from exec-path (in case not found in $PATH)
+              (setcar orig-result command-from-exec-path))
+            (message "Using emacs-lsp-booster for %s!" orig-result)
+            (cons "emacs-lsp-booster" orig-result))
+        orig-result)))
+  (advice-add 'lsp-resolve-final-command :around #'lsp-booster--advice-final-command)
+#+end_src
+
+* SANE DEFAULTS
+** Splash/scratch & startup messages
+PERF: this keeps the session from activating a heavy major mode and writing to =*Messages*=, which triggers premature frame redraws.
+https://github.com/doomemacs/doomemacs/blob/master/lisp/doom.el
+#+begin_src emacs-lisp
+  (setq inhibit-startup-screen t
+        initial-scratch-message nil
+        initial-major-mode 'fundamental-mode
+        inhibit-startup-echo-area-message user-login-name)
+
+  ;; Suppress startup screen completely
+  (advice-add #'display-startup-screen :override #'ignore)
+#+end_src
+
+** Disable client instructions
+#+begin_src emacs-lisp
+  (setq server-client-instructions nil)
+#+end_src
+
+** Warnings & debug output
+Warn only about ~serious issues~.
+#+begin_src emacs-lisp
+  (setq warning-minimum-level :emergency)
+#+end_src
+
+A few ~somewhat useless~ warnings.
+#+begin_src emacs-lisp
+  (setq find-file-suppress-same-file-warnings t)
+  (setq warning-suppress-types '((defvaralias)))
+  (setq ad-redefinition-action 'accept)
+#+end_src
+
+NOTE(abi): native compilation warnings are generally safe to ignore. If needed start Emacs with =--debug-init=.
+#+begin_src emacs-lisp
+  (setq native-comp-async-report-warnings-errors init-file-debug
+        native-comp-warning-on-missing-source init-file-debug)
+#+end_src
+
+Minimal, less verbose debug output.
+#+begin_src emacs-lisp
+  (setq debug-on-error init-file-debug
+        jka-compr-verbose init-file-debug)
+#+end_src
+
+** Disable all GUI crutches
+No menu bar, tool bar or scroll bars.
+#+begin_src emacs-lisp
+  ;; While all these modules are immediately available at startup we want to set these by
+  ;; pushing to `default-frame-alist' (in `early-init.el') instead of disabling the modes
+  ;; directly. By doing so, we ensure no extra redraw gets triggered/queued at startup.
+  ;; NOTE(abi): a poorly timed redraw might be an expensive operation, reliant on the windowing
+  ;; system.
+  (push '(menu-bar-lines . 0) default-frame-alist)
+  (push '(tool-bar-lines . 0) default-frame-alist)
+  (push '(vertical-scroll-bars) default-frame-alist)
+#+end_src
+
+I don't particularly enjoy tooltips or the blinking cursor; disable them.
+#+begin_src emacs-lisp
+  (tooltip-mode -1)
+  (blink-cursor-mode -1)
+#+end_src
+
+Shush the bell when I mess up.
+#+begin_src emacs-lisp
+  (setq ring-bell-function 'ignore)
+#+end_src
+
+** Default to fullscreen
+IMPORTANT(abi): it may not play nicely with tiling window managers.
+#+begin_src emacs-lisp :tangle no
+  (add-to-list 'default-frame-alist '(fullscreen . maximized))
+#+end_src
+
+** Don't pollute init file with settings from customize
+It drives me nuts when customize adds variables at the end of my config, let's store them in a separate =custom.el= file.
+#+begin_src emacs-lisp
+  (setq custom-file (concat user-emacs-directory "custom.el"))
+  (load custom-file 'noerror)
+#+end_src
+
+** Coding system
+Ensure UTF-8 everywhere, by making it the default character encoding system.
+https://www.gnu.org/software/emacs/manual/html_node/emacs/Language-Environments.html
+#+begin_src emacs-lisp
+  ;; Make 'UTF-8' the default coding system.
+  (set-language-environment "UTF-8")
+
+  ;; NOTE(abi): `set-language-environment' sets `default-input-method', reset it.
+  (setq default-input-method nil)
+#+end_src
+
+This shouldn't be needed anymore, but we'll keep them around, just in case we run into issues with the above.
+#+begin_src emacs-lisp :tangle no
+  (prefer-coding-system 'utf-8)
+
+  ;; Terminal I/O
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+
+  ;; File handling
+  (set-buffer-file-coding-system 'utf8)
+  (set-file-name-coding-system 'utf8)
+
+  ;; Clipboard and selection
+  (set-selection-coding-system 'utf-8)
+  (set-clipboard-coding-system 'utf-8)
+  (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+#+end_src
+
+** File management
+Watch for external file changes and automatically update affected buffers.
+#+begin_src emacs-lisp
+  (use-package autorevert
+    :straight (:type built-in)
+    :diminish auto-revert-mode
+    :custom
+    (auto-revert-interval 2)
+    (auto-revert-check-vc-info t)
+    (auto-revert-remote-files nil)
+    (auto-revert-verbose nil)
+    :config
+    (global-auto-revert-mode 1))
+#+end_src
+#+begin_src emacs-lisp
+  (setq load-prefer-newer t)
+#+end_src
+
+** Easy confirmation
+Prompt confirmations may take one of two forms: =yes-or-no= or =y-or-n=. I much prefer the latter,
+so let's define an alias to circumvent the former.
+#+begin_src emacs-lisp
+  (defalias 'yes-or-no-p 'y-or-n-p)
+#+end_src
+
+** Easy kill
+Whenever a buffer has an associated process running, Emacs will prompt you for confirmation when trying to kill it. I always want to kill the active buffer; let's disable that behaviour.
+#+begin_src emacs-lisp
+  (setq confirm-kill-processes nil)
+#+end_src
+
+** Echo keystrokes asap
+#+begin_src emacs-lisp
+  (setq echo-keystrokes 0.01)
+#+end_src
+
+** Prevent hanging on large single-line files
+#+begin_src emacs-lisp
+  (use-package so-long
+    :straight (:type built-in)
+    :config
+    (global-so-long-mode 1))
+#+end_src
+
+** Kill ring & mark management
+#+begin_src emacs-lisp
+  (use-package simple
+    :straight (:type built-in)
+    :custom
+    ;; Cull duplicates in the kill ring
+    (kill-do-not-save-duplicates t)
+    ;; Pop marks
+    (set-mark-command-repeat-pop t))
+#+end_src
+
+** Write over selected region
+#+begin_src emacs-lisp
+  (use-package delsel
+    :straight (:type built-in)
+    :config
+    (delete-selection-mode 1))
+#+end_src
+
+** Save cursor location
+#+begin_src emacs-lisp
+  (use-package saveplace
+    :ensure nil
+    :config
+    (save-place-mode 1))
+#+end_src
+** Mouse yank at point
+By default this is nil and yanks at click position instead, leading to accidental text insert in random places.
+#+begin_src emacs-lisp
+  (setq mouse-yank-at-point t)
+#+end_src
+
+** Resizing
+#+begin_src emacs-lisp
+  ;; NOTE(abi): resizing the frame in steps can leave gaps when using tiling window managers.
+  (setq frame-resize-pixelwise t)
+
+  ;; Don't resize windows pixelwise though, it can lead to crashes.
+  (setq window-resize-pixelwise nil)
+#+end_src
+** Security
+Reject =SSL/TLS= server certificates that =GnuTLS= determines as invalid.
+#+begin_src emacs-lisp
+  (use-package gnutls
+    :straight (:type built-in)
+    :custom
+    (gnutls-verify-error t))
+#+end_src
+
+** Scrolling
+Don't recenter the window like crazy when scrolling the cursor past the boundaries.
+#+begin_src emacs-lisp
+  ;; IMPORTANT(abi): setting `scroll-conservatively' to over 100 stops the window from
+  ;; ever getting recentered automatically.
+  (setq scroll-conservatively 15)
+#+end_src
+
+Scrolling steps.
+#+begin_src emacs-lisp
+  (setq scroll-step 1
+        hscroll-step 1)
+#+end_src
+
+Small horizontal margins for truncated lines, but no vertical ones whatsoever.
+#+begin_src emacs-lisp
+  (setq scroll-margin 0
+        hscroll-margin 2)
+#+end_src
+
+Preserve cursor location when scrolling scrolling down and back up again.
+#+begin_src emacs-lisp
+  (setq scroll-preserve-screen-position t)
+#+end_src
+
+NOTE(abi): this reduces cursor lag slightly.
+#+begin_src emacs-lisp
+  ;; Don't auto-adjust `window-vscroll' for tall lines.
+  (setq auto-window-vscroll nil)
+#+end_src
+
+By default the mouse wheel/trackpad scroll speed is too fast and speeds up progressively. It gets in the way of precision; let's change it.
+#+begin_src emacs-lisp
+  (use-package mwheel
+    :straight (:type built-in)
+    :custom
+    (mouse-wheel-scroll-amount '(2 ((shift) . hscroll)))
+    (mouse-wheel-scroll-amount-horizontal 2)
+    (mouse-wheel-progressive-speed nil)
+    (mouse-wheel-flip-direction t)
+    (mouse-wheel-tilt-scroll t))
+#+end_src
+
+Pixel-perfect, smoooth scrolling.
+#+begin_src emacs-lisp
+  (use-package pixel-scroll
+    :straight (:type built-in)
+    :init
+    (defun abi/pixel-scroll-kbd-up ()
+      "Smooth scroll down"
+      (interactive)
+      (let ((pixel-scroll-precision-interpolation-factor 15)
+        	  (half-height (/ (window-height) 2)))
+        (unless (pos-visible-in-window-p (point-min))
+      	(pixel-scroll-precision-interpolate (* 1 half-height)))
+        (pixel-scroll-precision-interpolate (* 1 half-height))))
+
+    (defun abi/pixel-scroll-kbd-down ()
+      "Smooth scroll down"
+      (interactive)
+      (let ((pixel-scroll-precision-interpolation-factor 15)
+        	  (half-height (/ (window-height) 2)))
+        (unless (pos-visible-in-window-p (point-max))
+      	(pixel-scroll-precision-interpolate (* 1 (- half-height))))
+        (pixel-scroll-precision-interpolate (* 1 (- half-height)))))
+
+    :custom
+    ;; Interpolation
+    (pixel-scroll-precision-interpolate-mice t)
+    (pixel-scroll-precision-interpolate-page t)
+    
+    ;; Momentum
+    (pixel-scroll-precision-use-momentum t)
+    (pixel-scroll-precision-momentum-min-velocity 5.0)
+    
+    ;; Smoother mouse scrolling experience
+    (pixel-scroll-precision-large-scroll-height 40)
+    (pixel-scroll-precision-interpolation-factor 3)
+
+    :config
+    (pixel-scroll-precision-mode 1)
+    (bind-keys
+     ("M-u" . abi/pixel-scroll-kbd-up)
+     ("M-d" . abi/pixel-scroll-kbd-down))
+
+    ;; TODO(abi): figure out why this doesn't work.
+    ;; :bind
+    ;;   ;; Vertico & corfu integration
+    ;;   (:map vertico-map
+    ;;   	([remap pixel-scroll-interpolate-up] . vertico-scroll-up)
+    ;;   	([remap pixel-scroll-interpolate-down] . vertico-scroll-down))
+    ;;   (:map corfu-map
+    ;;   	([remap pixel-scroll-interpolate-up] . corfu-scroll-up)
+    ;;   	([remap pixel-scroll-interpolate-down] . corfu-scroll-down))
+    )
+#+end_src
+
+** Suspend frame
+Let's prevent suspending the frame accidentally.
+#+begin_src emacs-lisp
+  (unbind-key "C-x C-z")
+#+end_src
+
+* LOOK & FEEL
+** Theme
+Catppuccin is my go-to for themes these days.
+#+begin_src emacs-lisp
+  (use-package 
+    catppuccin-theme
+    :init
+    (load-theme 'catppuccin :no-confirm)
+    :config
+    (setq catppuccin-flavor 'macchiato)
+    (catppuccin-reload))
+#+end_src
+
+The infamous =doom-themes= package is also great. It offers a wide selection of themes that integrate nicely with lots of popular packages. I like to keep them around in case I feel like switching things up.
+#+begin_src emacs-lisp
+  (use-package doom-themes
+    :config
+    (setq doom-themes-enable-bold t
+  	doom-themes-enable-italic t
+  	doom-themes-treemacs-enable-variable-pitch nil))  
+#+end_src
+
+Switch between light and dark themes based on the current time.
+#+begin_src emacs-lisp
+  (defun abi/auto-synchronize-theme ()
+    "Automatically switch between light and dark themes based on time of day."
+    (let* ((dark-theme 'macchiato)
+           (light-theme 'latte)
+           (start-time 5)
+           (end-time 8)
+           (hour (nth 2 (decode-time (current-time))))
+           (current-theme (if (member hour (number-sequence start-time end-time))
+                              light-theme dark-theme)))
+      (when (not (equal (car custom-enabled-themes) current-theme))
+        ;;(setq doom-theme current-theme)
+        ;;(load-theme current-theme)
+        (setq catppuccin-flavor current-theme)
+        (catppuccin-reload))))
+
+  ;; Check every 15 minutes
+  (run-with-timer 0 900 'abi/auto-synchronize-theme)
+#+end_src
+
+NOTE(abi): at some point I started working on my own theme, but it's not quite ready yet. I'll leave this here in case I ever do finish it.
+#+begin_src emacs-lisp :tangle no
+  (add-to-list 'custom-theme-load-path "~/.config/emacs/themes")
+  (load-theme 'abi-theme :no-confirm)
+#+end_src
+
+** TODO Modeline & echo area
+#+begin_src emacs-lisp :tangle no
+  ;; NOTE(abi): we need to disable it early or else it'll be present in the `*scratch*' buffer.
+  (defvar abi/original-modeline-format mode-line-format
+    "Default Emacs `mode-line-format' before any modifications.")
+
+  (defvar abi/buffers-where-modeline-moved nil
+    "List of buffers where the modeline has been moved to the header line.")
+
+  (defvar abi/ignored-buffer-names '("*Messages*" "*scratch*" "*Completions*" "*Help*" "*Apropos*")
+    "List of buffer names where modeline should not be moved to header line.")
+
+  (defvar abi/ignored-buffer-name-patterns '("^\\*.*\\*$")
+    "List of regex patterns for buffer names where modeline should not be moved.")
+
+  (defun abi/should-move-modeline-p (buffer)
+    "Return t if modeline should be moved to header line in BUFFER."
+    (with-current-buffer buffer
+      (let ((name (buffer-name)))
+        (and (not (string-prefix-p " " name))  ; Don't move in hidden buffers
+             (not (cl-some (lambda (pattern) (string-match-p pattern name))
+                           abi/ignored-buffer-name-patterns))
+             (not (member name abi/ignored-buffer-names))))))
+
+  (defun abi/move-modeline-to-headerline ()
+    "Move the current modeline to the header line in appropriate buffers, hiding the actual modeline."
+    (interactive)
+    (dolist (buf (buffer-list))
+      (with-current-buffer buf
+        (when (and (abi/should-move-modeline-p buf)
+                   (not (memq buf abi/buffers-where-modeline-moved)))
+          ;; Store buffer-local original modeline
+          (setq-local abi/current-modeline-format mode-line-format)
+          ;; Move modeline to headerline
+          (setq-local header-line-format mode-line-format
+                      mode-line-format nil)
+          (push buf abi/buffers-where-modeline-moved)))))
+
+  (defun abi/restore-modeline-position ()
+    "Restore the original modeline in all buffers where it was moved."
+    (interactive)
+    (dolist (buf abi/buffers-where-modeline-moved)
+      (when (buffer-live-p buf)
+        (with-current-buffer buf
+          (setq-local mode-line-format
+                      (if (boundp 'abi/current-modeline-format)
+                          abi/current-modeline-format
+                        abi/original-modeline-format))
+          (setq-local header-line-format nil)
+          (when (boundp 'abi/current-modeline-format)
+            (kill-local-variable 'abi/current-modeline-format)))))
+    (setq abi/buffers-where-modeline-moved nil))
+
+  ;; Optional: Add this to automatically skip popup buffers
+  (defun abi/move-modeline-to-headerline-safely ()
+    "Safer version that skips popup and special buffers."
+    (interactive)
+    (abi/move-modeline-to-headerline))
+
+  ;; Optional: Uncomment to enable automatically on startup
+  (add-hook 'emacs-startup-hook #'abi/move-modeline-to-headerline-safely)
+#+end_src
+
+Once again, Doom Emacs comes to the rescue. It has one of the best modelines around (minimal, beautiful and very customizable). It's used by multiple other distributions. Let's set it up.
+#+begin_src emacs-lisp :tangle no
+  (use-package doom-modeline
+    :init
+    (setq doom-modeline-buffer-file-name-style 'relative-from-project
+          doom-modeline-major-mode-icon t
+          doom-modeline-modal t
+          doom-modeline-modal-icon t
+          doom-modeline-modern-modal-icon t
+  	doom-modeline-percent-position nil
+  	doom-modeline-buffer-encoding nil
+  	doom-modeline-indent-info nil
+          doom-modeline-lsp nil)
+    :hook
+    (doom-modeline-mode . (lambda (&rest _)
+    			  (if (bound-and-true-p doom-modeline-mode)
+                                (abi/move-modeline-to-headerline)
+    			    (abi/restore-modeline-position))))
+    (after-init . (lambda (&rest _)
+                    "Ensure that 'mini-modeline-mode' gets disabled."
+                    (if (bound-and-true-p mini-modeline-mode)
+                        (mini-modeline-mode -1))
+                    (doom-modeline-mode 1))))
+#+end_src
+
+As you start to split the frame screen real state into several windows, modelines get populated left and right. This package gets rid of them all but one, which gets displayed in the minibuffer. Note that you can turn the mode on and off. Sadly, it doesn't play nice with =doom-modeline=, so disable that while it's on.
+TODO(abi): look into =hide-mode-line= as an alternative.
+#+begin_src emacs-lisp :tangle no
+  (use-package mini-modeline
+    :after doom-modeline
+    :init (setq mini-modeline-r-format t)
+    :hook (mini-modeline-mode . (lambda (&rest _)
+  				(if (bound-and-true-p mini-modeline-mode)
+  				    (doom-modeline-mode -1)
+  				  (doom-modeline-mode 1)))))
+#+end_src
+
+Alternatively, we can use =awesome-tray= to hide modelines altogether and show the most relevant information in the echo area.
+#+begin_src emacs-lisp :tangle no
+  ;; TODO(abi): make it play nice with the modeline in the tab bar.
+  (use-package awesome-tray
+    :straight (awesome-tray
+  	     :type git
+  	     :host github
+  	     :repo "manateelazycat/awesome-tray"))
+#+end_src
+
+Hide minor modes.
+#+begin_src emacs-lisp
+  (use-package diminish
+    :defer t)
+#+end_src
+
+Sleek modeline.
+#+begin_src emacs-lisp
+  (use-package sleek-modeline
+    :straight nil
+    :load-path "~/dev/sleek-modeline"
+    :after catppuccin-theme
+    :custom
+    (sleek-modeline-show-modal-state t)
+    (sleek-modeline-size 'medium)
+    :config
+    (sleek-modeline-mode 1))
+#+end_src
+
+** TODO Frames & windows
+With =window-divider= we get finer control over window borders.
+#+begin_src emacs-lisp
+  (when (boundp 'window-divider-mode)
+    (setq window-divider-default-places t
+          window-divider-default-right-width 8
+          window-divider-default-bottom-width 8)
+    (window-divider-mode 1))
+
+  ;; Get the current background color
+  (defun abi/get-background-color ()
+    "Return the current background color."
+    (face-attribute 'default :background))
+
+  ;; Set window divider faces with current background color
+  (let ((bg-color (abi/get-background-color)))
+    (face-spec-set 'window-divider `((t :foreground ,bg-color)))
+    (face-spec-set 'window-divider-first-pixel `((t :foreground ,bg-color)))
+    (face-spec-set 'window-divider-last-pixel `((t :foreground ,bg-color))))
+
+  ;; Set internal border with current background color
+  (add-to-list 'default-frame-alist '(internal-border-width . 8))
+  (face-spec-set 'internal-border `((t :background ,(abi/get-background-color))))
+
+  ;; (when (boundp 'window-divider-mode)
+  ;;     (setq window-divider-default-places t
+  ;;           window-divider-default-right-width 7
+  ;;           window-divider-default-bottom-width 7)
+  ;;     (window-divider-mode 1))
+
+  ;;   (face-spec-set 'window-divider '((t :foreground "#191B20")))
+  ;;   (face-spec-set 'window-divider-first-pixel '((t :foreground "#141519")))
+  ;;   (face-spec-set 'window-divider-last-pixel '((t :foreground "#141519")))
+
+  ;; Let's also add a small border around the frame
+  ;; (add-to-list 'default-frame-alist '(internal-border-width . 5))
+  ;; (face-spec-set 'internal-border '((t :background "#141519")))
+
+  ;; (modify-all-frames-parameters
+  ;;  '((right-divider-width . 15)
+  ;;    (bottom-divider-width . 15)
+  ;;    (internal-border-width . 15)))
+
+  ;; (dolist (face '(window-divider
+  ;;                 window-divider-first-pixel
+  ;;                 window-divider-last-pixel))
+  ;;   (face-spec-reset-face face)
+  ;;   (set-face-foreground face (face-attribute 'default :background)))
+  ;; (set-face-background 'fringe (face-attribute 'default :background))
+#+end_src
+
+Nowadays we have =spacious-padding=, which provides a much better solution than the above.
+#+begin_src emacs-lisp :tangle no
+  (use-package spacious-padding
+    :straight (spacious-padding
+  	     :type git
+  	     :host github
+  	     :repo "emacs-straight/spacious-padding"
+  	     :files ("*" (:exclude ".git")))
+    :custom
+    (spacious-padding-widths
+     '( :internal-border-width 10
+        :header-line-width 0
+        :mode-line-width 0
+        :tab-width 4
+        :right-divider-width 10
+        :scroll-bar-width 8))
+    :hook
+    (after-init . spacious-padding-mode))
+#+end_src
+
+Easily distingish buffers not associated to a file with =solaire-mode=.
+#+begin_src emacs-lisp :tangle no
+  (use-package solaire-mode
+    :config
+    (setq solaire-mode-auto-swap-bg t)
+    (push '(treemacs-window-background-face . solaire-default-face) solaire-mode-remap-alist)
+    (push '(treemacs-hl-line-face . solaire-hl-line-face) solaire-mode-remap-alist)
+    :hook
+    (after-init . solaire-global-mode)
+    (dashboard-mode . turn-off-solaire-mode))
+#+end_src
+
+TODO(abi): look into implementing true background transparency, =alpha-background=, for the win32 platform layer.
+#+begin_src emacs-lisp
+  ;; NOTE(abi): to apply parameters to the current frame, we need to use `set-frame-parameter'.
+  (add-to-list 'default-frame-alist '(alpha-background . 100))
+  (set-frame-parameter nil 'alpha-background 100)
+#+end_src
+
+** Cursor
+NOTE(abi): for a fancier cursor shape, try =bar=. I have grown fond of the default brick-shaped one though; it's easy to spot and it works great with monospaced fonts.
+#+begin_src emacs-lisp
+  (setq-default cursor-type 'box)
+#+end_src
+
+Don't stretch the cursor for wide characters.
+#+begin_src emacs-lisp
+  (setq x-stretch-cursor nil)
+#+end_src
+
+Change cursor color while mark is active.
+TODO(abi): clean this up & submit it to =MELPA=.
+#+begin_src emacs-lisp
+  (use-package region-cursors
+    :straight nil
+    :load-path "~/dev/region-cursors/"
+    ;; :straight (region-cursors
+    ;;     :type git
+    ;;     :host github
+    ;;     :repo "abidanBrito/region-cursors")
+    :custom
+    ;; (region-cursors-cursor-shape 'bar)
+    ;; (region-cursors-cursor-bar-width 2)
+    (region-cursors-cursor-shape 'box)
+    (region-cursors-animation 'pulse)
+    ;;(region-cursors-animation-interval 1.0)
+    ;;(region-cursors-animation-delay 0.75)
+    (region-cursors-disable-hl-line-mode t)
+    (region-cursors-disabled-modes '(org-mode))
+    :config
+    (region-cursors-mode 1))
+#+end_src
+
+** Line numbers & truncated lines
+IMPORTANT(abi): we avoid using =global-display-line-numbers-mode= because it does affect performance a bit. Besides, there's treemacs, dired and other temporary modes for which we really don't want line numbers.
+#+begin_src emacs-lisp
+  ;; PERF(abi): skip per-buffer (on-the-fly) width computations by explicitly defining it.
+  (use-package display-line-numbers
+    :ensure nil
+    :hook
+    ((prog-mode conf-mode) . display-line-numbers-mode)
+    :config
+    (setq-default display-line-numbers-width 3
+                  display-line-numbers-wide t
+  		display-line-numbers-type 'relative)
+    (bind-key* (kbd "C-c t n") #'(lambda (&rest _)
+  				 "Toggle line numbers."
+  				 (interactive)
+  				 (display-line-numbers-mode 'toggle)))
+    (bind-key* (kbd "C-c t r") #'(lambda (&rest _)
+                                   "Toggle between absolute and relative line numbers."
+                                   (interactive)
+                                   (setq display-line-numbers-type
+                                         (if (eq display-line-numbers-type 'relative)
+                                             t
+                                           'relative))
+                                   (display-line-numbers-mode))))
+#+end_src
+
+** Line spacing
+#+begin_src emacs-lisp
+  (setq-default line-spacing 0.1)
+#+end_src
+
+** Underline display
+Underline at descent position, not baseline position.
+#+begin_src emacs-lisp
+  (setq x-underline-at-descent-line t)
+#+end_src
+
+** Code annotations & other font-lock rules
+#+begin_src emacs-lisp
+  ;; Affected modes
+  (defvar hl-annotation-modes '(text-mode-hook prog-mode-hook org-mode-hook))
+
+  ;; Macro to speed up ease face definitions
+  (defmacro define-face-foreground (face-name foreground)
+    "Define face with the given FACE-NAME and FOREGROUND color."
+    `(progn
+       (unless (facep ',face-name)
+         (make-face ',face-name)
+         (modify-face ',face-name ,foreground nil nil t nil nil nil nil))))
+
+  ;; Faces
+  (define-face-foreground font-lock-fixme-face "#CF4038")
+  (define-face-foreground font-lock-todo-face "#FFA500")
+  (define-face-foreground font-lock-important-face "#CFBC32")
+  (define-face-foreground font-lock-note-face "#71BA3C")
+  (define-face-foreground font-lock-optimization-face "#9066EE")
+
+  ;; Keywords
+  (defun abi/highlight-annotations ()
+    "Add font-lock rules to highlight annotation keywords."
+    (font-lock-add-keywords
+     nil
+     '(("\\<\\(FIXME\\)" 1 'font-lock-fixme-face t)
+       ("\\<\\(BUG\\)" 1 'font-lock-fixme-face t)
+       ("\\<\\(HACK\\)" 1 'font-lock-fixme-face t)
+       ("\\<\\(TODO\\)" 1 'font-lock-todo-face t)
+       ("\\<\\(TEMP\\)" 1 'font-lock-todo-face t)
+       ("\\<\\(IMPORTANT\\)" 1 'font-lock-important-face t)
+       ("\\<\\(QUESTION\\)" 1 'font-lock-important-face t)
+       ("\\<\\(NOTE\\)" 1 'font-lock-note-face t)
+       ("\\<\\(PERF\\)" 1 'font-lock-optimization-face t))))
+
+  ;; Hooks
+  (add-hook 'text-mode-hook #'abi/highlight-annotations)
+  (add-hook 'prog-mode-hook #'abi/highlight-annotations)
+  (add-hook 'org-mode-hook #'abi/highlight-annotations)
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package italic-keywords
+    :straight nil
+    :load-path "~/dev/elisp"
+    :config
+    (global-italic-keywords-mode 1))
+#+end_src
+** Indentation guides
+#+begin_src emacs-lisp
+  (use-package indent-bars
+    :custom
+    (indent-bars-treesit-support t)
+    (indent-bars-treesit-ignore-blank-lines-types '("module"))
+    (indent-bars-treesit-scope '((python
+                                  function_definition
+                                  class_definition
+                                  for_statement
+                                  if_statement
+                                  with_statement
+                                  while_statement)))
+    :hook
+    ((python-base-mode yaml-mode) . indent-bars-mode))
+#+end_src
+
+** TODO Highlights
+Make it easier to focus on the current line by highlighting it.
+#+begin_src emacs-lisp
+  (use-package hl-line
+    :straight (:type built-in)
+    :config
+    (global-hl-line-mode t))
+#+end_src
+
+Highlight hex color strings by applying matching background faces.
+#+begin_src emacs-lisp
+  (use-package rainbow-mode
+    :defer t
+    :hook (prog-mode . rainbow-mode))
+#+end_src
+
+TODO(abi): check if this is even necessary. I couldn't see any differences in =c++-ts-mode=.
+Escape sequences are not plain text and need to be interpreted. By highlighting them we provide a visual cue which can help prevent errors.
+#+begin_src emacs-lisp :tangle no
+  (use-package highlight-escape-sequences
+    :defer t
+    :hook (prog-mode . hes-mode))
+#+end_src
+
+** Title bar
+Show the path to current file on the title bar.
+#+begin_src emacs-lisp
+  (setq frame-title-format
+        '((:eval (if (buffer-file-name)
+                     (abbreviate-file-name (buffer-file-name)) "%b"))))
+#+end_src
+
+Alternatively, we could remove it completely.
+#+begin_src emacs-lisp :tangle no
+  ;; NOTE(abi): this results in square corners for the frame.
+  ;; (set-frame-parameter nil 'undecorated nil)
+#+end_src
+
+** Icons
+Nerd fonts are great, let's used them for icon fonts.
+#+begin_src emacs-lisp
+  (use-package nerd-icons
+    :custom (nerd-icons-font-family "Symbols Nerd Font Mono"))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package nerd-icons-completion
+    :straight (nerd-icons-completion
+  	     :type git
+  	     :host github
+  	     :repo "rainstormstudio/nerd-icons-completion")
+    :after nerd-icons
+    :config (nerd-icons-completion-mode))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package nerd-icons-dired
+    :after nerd-icons
+    :preface
+    (defun abi/nerd-icons-dired-mode-unless-remote ()
+      "Enable nerd-icons-dired-mode only for local directories."
+      (unless (file-remote-p default-directory)
+        (nerd-icons-dired-mode 1)))
+    :hook (dired-mode . abi/nerd-icons-dired-mode-unless-remote))
+#+end_src
+
+#+begin_src emacs-lisp  
+  (use-package treemacs-nerd-icons
+    :after (nerd-icons treemacs)
+    :config (treemacs-load-theme "nerd-icons"))
+#+end_src
+
+Alternatively, we could use the battle-tested ==all-the-icons==.
+NOTE(abi): it is not compatible with the TTY version, but we'll keep it here as a fallback.
+#+begin_src emacs-lisp :tangle no
+  (use-package all-the-icons
+    :if (and (display-graphic-p) (not (package-installed-p 'nerd-icons)))
+    :commands all-the-icons-install-fonts
+    :init
+    (unless (find-font (font-spec :name "all-the-icons"))
+      (all-the-icons-install-fonts t)))
+
+  (use-package all-the-icons-dired
+    :if (and (display-graphic-p) (not (package-installed-p 'nerd-icons)))
+    :hook (dired-mode . all-the-icons-dired-mode))
+#+end_src
+
+* FONTS
+** Default font faces
+#+begin_src emacs-lisp
+  (defvar abi/windows-font "JetBrainsMono NFM-14" "Default font for Windows.")
+  ;; (defvar abi/linux-font "CaskaydiaCove Nerd Font-14" "Default font for GNU/Linux.")
+  (defvar abi/linux-font "Maple Mono NF-14" "Default font for GNU/Linux.")
+
+  (defun abi/default-frame-font (FRAME FONT-NAME)
+    "Set the default font for a given frame. 'FRAME' is the frame to configure. 'FONT-NAME' is the font to set."
+    (with-selected-frame FRAME
+      (when (find-font (font-spec :name (car (split-string FONT-NAME "-"))))
+        (set-frame-font FONT-NAME t t))))
+
+  ;; Set default font for the target platform, on a per-frame basis
+  ;; NOTE(abi): for Windows we ensure font anti-aliasing and hinting.
+  (let ((default-font
+         (cond ((string-equal system-type "windows-nt")
+                (concat abi/windows-font ":antialias=standard:hinting=true:adstyle=mono"))
+               ((string-equal system-type "gnu/linux") abi/linux-font)
+               (t nil))))
+    (when default-font
+      (if (daemonp)
+          (add-hook 'after-make-frame-functions
+                    (lambda (FRAME) (abi/default-frame-font FRAME default-font)))
+        ;; For non-daemon mode, set the font for the initial and all subsequent frames as well
+        (add-to-list 'initial-frame-alist `(font . ,default-font))
+        (add-to-list 'default-frame-alist `(font . ,default-font)))))
+#+end_src
+
+** Font scaling
+You can use the binding =CTRL +/-= for zooming in and out. You can also use =CTRL with the mouse wheel=.
+#+begin_src emacs-lisp
+  (bind-keys ("C-+" . text-scale-increase)
+  	   ("C--" . text-scale-decrease)
+  	   ("<C-wheel-up>" . text-scale-increase)
+  	   ("<C-wheel-down>" . text-scale-decrease)
+  	   ("C-0" . (lambda (&rest _)
+  		      (interactive)
+  		      (text-scale-set 0))))
+#+end_src
+
+* ESSENTIALS
+** TODO Minibuffer & completion framework
+Recursive minibuffer instances & increased history length.
+#+begin_src emacs-lisp
+  ;; NOTE(abi): this way we may prompt new minibuffer instances while one is already open.
+  (setq enable-recursive-minibuffers t
+        history-length 1000)
+
+  (minibuffer-depth-indicate-mode 1)
+#+end_src
+
+Minimalistic completion UI, based on the default completion system.
+#+begin_src emacs-lisp
+  (use-package vertico
+    :bind (:map vertico-map
+                ("M-k" . vertico-previous)
+    	      ("M-j" . vertico-next)
+    	      ("M-u" . vertico-scroll-down)
+    	      ("M-d" . vertico-scroll-up)
+    	      ("M-g" . vertico-grid-mode)
+    	      ("M-q" . vertico-quick-exit)
+    	      ("C-q" . vertico-exit))
+    :init
+    (vertico-mode 1)
+    (vertico-mouse-mode 1)
+    (vertico-multiform-mode 1)
+    :custom
+    (vertico-cycle t)
+    (vertico-count 15)
+    (vertico-multiform-commands
+     `((consult-line buffer)
+       (consult-line-multi buffer)
+       (consult-ripgrep buffer)
+       (consult-fd buffer)
+       (consult-project buffer)
+       (consult-locate buffer)
+       (consult-yank-from-kill-ring buffer)
+       (t posframe)))
+
+    :config
+    (setopt vertico-buffer-display-action
+            '(display-buffer-in-side-window
+              (side . top)
+              (window-height . 0.35)))
+    
+    :hook
+    (vertico-buffer-mode . (lambda (&rest _)
+                             (setq header-line-format nil)
+    			   (text-scale-set -1))))
+#+end_src
+
+Floating frame for =vertico=.
+#+begin_src emacs-lisp
+  (use-package vertico-posframe
+    :after vertico
+    :custom
+    (vertico-posframe-poshandler #'posframe-poshandler-frame-center)
+    (vertico-posframe-border-width 3)
+    (vertico-posframe-parameters
+     '((left-fringe . 12)
+       (right-fringe . 12)))
+    :custom-face
+    (vertico-posframe-border ((t (:inherit default :background "#CFA980"))))
+    :config
+    ;; Automatically disable posframe for any command using buffer mode
+    (setq vertico-posframe-fallback-mode 
+  	(mapcar #'car (seq-filter
+  		       (lambda (cmd-config)
+    			 (and (listp cmd-config)
+  			      (eq (cadr cmd-config) 'buffer)))
+    		       vertico-multiform-commands)))
+    (vertico-posframe-mode 1))
+#+end_src
+
+Out-of-order pattern matching for space-separated components.
+#+begin_src emacs-lisp
+  ;; NOTE(abi): by default it matches literals and regular expressions, but other matching styles can be set up.
+  (use-package orderless
+    :custom
+    (completion-styles '(orderless basic))
+    (completion-category-overrides '((file (styles basic partial-completion)))))
+#+end_src
+
+=Consult= fits well into this new wave of minimal packages, by providing search and navigation commands, based on the built-in =completion-read= function. It helps to streamline a cohesive and well-integrated completion environment.
+#+begin_src emacs-lisp
+  (use-package consult
+    :bind (("C-c b b" . consult-buffer)
+           ("C-c f r" . consult-recent-file)
+           ("C-c k" . consult-yank-from-kill-ring)
+           ;; Bindings in `search-map'
+           ("C-f" . consult-line)
+           ("M-s L" . consult-line-multi)
+           ("M-s r" . consult-ripgrep)
+           ("M-s f" . consult-fd)
+           ;; Bindings in `goto-map'
+           ;;("M-g l" . consult-goto-line)
+           ("M-g m" . consult-mark)
+           ("M-g M" . consult-global-mark)
+           ("M-g o" . consult-outline)
+           ("M-g i" . consult-imenu)
+           ("M-g I" . consult-imenu-multi)
+           ("M-g e" . consult-compile-error)
+           ("M-g f" . consult-flymake)
+           (:map minibuffer-local-map
+                 ("C-r" . consult-history)))
+    :custom
+    (consult-narrow-key "<")
+    (consult-fd-args "fd --full-path --hidden --color=never")
+    (consult-project-root-function #'(lambda(&rest _)
+                                       (when (fboundp 'projectile-project-root)
+                                         (projectile-project-root))))
+    :config
+    (keymap-set consult-narrow-map (concat consult-narrow-key " ?") #'consult-narrow-help))
+#+end_src
+
+Helpful, colorful annotations for completion candidates.
+#+begin_src emacs-lisp
+  (use-package marginalia
+    :after vertico
+    :bind ((:map minibuffer-local-map
+  	       ("M-i" . marginalia-cycle))
+  	 (:map completion-list-mode-map
+  	       ("M-i" . marginalia-cycle)))
+    :config
+    (marginalia-mode 1))
+#+end_src
+
+Store selection history for completion lists.
+#+begin_src emacs-lisp
+  (use-package savehist
+    :config
+    (savehist-mode 1))
+#+end_src
+** TODO RSS reader
+#+begin_src emacs-lisp
+  (use-package elfeed
+    :hook (elfeed-show-mode . visual-line-mode)
+    :bind ("C-c n f" . elfeed)
+    :custom
+    (elfeed-sort-order 'descending)
+    (elfeed-search-filter "@5-year-ago +unread")
+    (elfeed-search-title-max-width 100)
+    (elfeed-search-title-min-width 30)
+    (elfeed-search-trailing-width 30)
+    (elfeed-show-truncate-long-urls t)
+    (elfeed-show-unique-buffers t)
+    (elfeed-feeds '(("http://www.jeremyong.com/feed.xml" gfx))))
+#+end_src
+
+** Embark
+#+begin_src emacs-lisp
+  (use-package embark
+    :bind
+    (("C-." . embark-act)
+     ("C-h b" . embark-bindings))
+    :config
+    ;; Move up some target finders to the top of the list
+    (let ((priority-finders '(embark-target-identifier-at-point
+                              embark-target-expression-at-point
+                              embark-target-sentence-at-point
+  			    embark-target-paragraph-at-point
+                              embark-target-defun-at-point)))
+      (setq embark-target-finders
+            (append (mapcar #'symbol-function priority-finders)
+                    (cl-remove-if (lambda (x) (memq x priority-finders))
+  				embark-target-finders))))
+
+    (add-to-list 'display-buffer-alist
+                 '("\\*Embark Actions\\*"
+  		 (display-buffer-in-side-window)
+  		 (side . right)
+  		 (window-width . 0.4)
+  		 (window-parameters (header-line-format . none))))
+    
+    (defun abi/set-embark-target-face ()
+      (set-face-attribute
+       'embark-target nil
+       :background (face-attribute 'region :background)
+       :foreground (if (boundp 'cursor-color-active-mark)
+        		     cursor-color-active-mark
+  		   (face-foreground 'default))))
+    
+    (abi/set-embark-target-face)
+    :hook
+    (after-load-theme . abi/set-embark-target-face))
+#+end_src
+
+#+begin_src emacs-lisp
+  ;; NOTE(abi). there's no need to set `:after', embark loads it on its own
+  ;; if `consult' is found.
+  (use-package embark-consult
+    :hook
+    (embark-collect-mode . consult-preview-at-point-mode))
+#+end_src
+
+** Org mode
+Org Mode is a major mode that supercharges GNU Emacs in a big way. Org is =a markup language like no other=. It can be used for a plethora of tasks, from note-taking, time-tracking and project management, to literate programming, scientific writing and even light web development.
+#+begin_src emacs-lisp
+  (use-package org
+    :straight (org
+  	     :type git
+  	     :repo "https://git.savannah.gnu.org/git/emacs/org-mode.git"
+  	     :local-repo "org"
+  	     :pre-build (straight-recipes-org-elpa--build)
+  	     :build (:not autoloads)
+  	     :files (:defaults "lisp/*.el" ("etc/styles/" "etc/styles/*")))
+    :demand t
+    :bind (("C-c o a" . org-agenda)
+  	 ("C-c o c" . org-capture)
+  	 ("C-c o l" . org-store-link)
+  	 ("C-c o i" . org-insert-link)
+  	 ("C-c o t" . org-todo)
+  	 ("C-c o s" . org-schedule)
+  	 ("C-c o d" . org-deadline)
+  	 ("C-c o p" . org-priority)
+  	 ("C-c o e" . org-export-dispatch))
+    :custom-face
+    (org-block ((t (:background unspecified :extend nil))))
+    (org-block-begin-line ((t (:background unspecified :extend nil :slant italic))))
+    (org-block-end-line ((t (:background unspecified :extend nil :slant italic))))
+    :custom
+    (org-edit-src-content-indentation 2)
+    (org-src-fontify-natively t)
+    (org-highlight-latex-and-related '(native)) ; Inline LaTeX highlighting
+    (org-hide-emphasis-markers t)
+    (org-pretty-entities t)
+    (org-startup-indented t)
+    (org-ellipsis " ⬅")
+    ;; NOTE(abi): these are cool, but `org-modern' is even cooler.
+    ;; (prettify-symbols-unprettify-at-point 'right-edge)
+    ;; (prettify-symbols-alist '(("#+BEGIN_SRC" . "λ")
+    ;; ("#+END_SRC" . "λ")
+    ;; ("#+begin_src" . "λ")
+    ;; ("#+end_src" . "λ")))
+    ;; (org-structure-template-alist
+    ;;  (append org-structure-template-alist
+    ;; 	   '(("l" . "src emacs-lisp")
+    ;;           ("p" . "src python"))))
+    (org-support-shift-select t)
+    (org-insert-heading-respect-content t)
+    (org-catch-invisible-edits 'show-and-error)
+    (org-startup-folded 'overview)
+    (org-special-ctrl-a/e t)
+    (org-tags-column 0)
+    ;; Tags
+    (org-tag-alist
+     '(;; Places
+       ("@home" . ?H)
+       ("@work" . ?W)
+
+       ;; Devices
+       ("@computer" . ?C)
+       ("@phone" . ?P)
+
+       ;; Activities
+       ("@planning". ?n)
+       ("@programming" . ?p)
+       ("@writing". ?w)
+       ("@creative" . ?c)
+       ("@email". ?e)
+       ("@calls" . ?a)
+       ("@errands" . ?r)))
+    (org-agenda-files '("~/notes/agenda/personal.org"
+  		      "~/notes/agenda/projects.org"
+  		      "~/notes/agenda/work.org"))
+    :hook
+    (org-mode . visual-line-mode)
+    (org-mode . prettify-symbols-mode))
+#+end_src
+
+Better looking =Org Mode=.
+#+begin_src emacs-lisp
+  (use-package org-modern
+    :custom
+    (org-modern-hide-stars t)
+    :hook
+    (org-mode . org-modern-mode))
+
+  (use-package org-modern-indent
+    :after org-modern
+    :straight (org-modern-indent
+  	     :type git
+  	     :host github
+  	     :repo "jdtsmith/org-modern-indent")
+    :hook
+    (org-modern-mode . org-modern-indent-mode))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package visual-fill-column
+    :straight (visual-fill-column
+  	     :type git
+  	     :host codeberg
+  	     :repo "joostkremers/visual-fill-column")
+    :defer t
+    :hook
+    (org-mode . visual-fill-column-mode)
+    :config
+    (setq visual-fill-column-width 200
+          visual-fill-column-center-text t))
+#+end_src
+** TODO Modal editing
+*** Evil mode
+#+begin_src emacs-lisp :tangle no
+  (use-package evil
+    :demand t
+    :init (setq evil-want-integration t
+                evil-want-keybinding nil
+                evil-vsplit-window-right t
+                evil-split-window-below t
+  	      evil-undo-system 'undo-fu)
+    :bind 
+    ("M-e" . (lambda (&rest _)
+  	     (interactive)
+  	     (if (evil-emacs-state-p)
+  		 (evil-normal-state)
+  	       (evil-emacs-state))))
+    :custom
+    (evil-default-state 'emacs)
+    :config
+    (evil-mode 1))
+
+  (use-package evil-collection
+    :after evil
+    :config (evil-collection-init))
+#+end_src
+
+#+begin_src emacs-lisp :tangle no
+  (use-package key-chord
+    :straight (key-chord
+  	     :type git
+  	     :host github
+  	     :repo "emacsorphanage/key-chord")
+    :config
+    (key-chord-define evil-insert-state-map "jk" 'evil-normal-state)
+    (key-chord-mode 1))
+#+end_src
+
+*** Meow
+#+begin_src emacs-lisp
+  (use-package meow
+    :config
+    (dolist (mode '(comint-mode
+      		  eshell-mode
+      		  shell-mode
+      		  term-mode
+      		  vterm-mode
+      		  eat-mode))
+      (add-to-list 'meow-mode-state-list (cons mode 'insert)))
+    
+    (defun meow-setup ()
+      (setq meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
+      (meow-motion-define-key
+       '("j" . meow-next)
+       '("k" . meow-prev)
+       '("<escape>" . ignore))
+      
+      (meow-normal-define-key
+       '("0" . meow-expand-0)
+       '("9" . meow-expand-9)
+       '("8" . meow-expand-8)
+       '("7" . meow-expand-7)
+       '("6" . meow-expand-6)
+       '("5" . meow-expand-5)
+       '("4" . meow-expand-4)
+       '("3" . meow-expand-3)
+       '("2" . meow-expand-2)
+       '("1" . meow-expand-1)
+       '("-" . negative-argument)
+       '(";" . meow-reverse)
+       '("," . meow-inner-of-thing)
+       '("." . meow-bounds-of-thing)
+       '("[" . meow-beginning-of-thing)
+       '("]" . meow-end-of-thing)
+       '("a" . meow-append)
+       '("A" . meow-open-below)
+       '("b" . meow-back-word)
+       '("B" . meow-back-symbol)
+       '("c" . meow-change)
+       '("d" . meow-delete)
+       '("D" . meow-backward-delete)
+       '("e" . meow-next-word)
+       '("E" . meow-next-symbol)
+       '("f" . meow-find)
+       '("g" . meow-cancel-selection)
+       '("G" . meow-grab)
+       '("h" . meow-left)
+       '("H" . meow-left-expand)
+       '("i" . meow-insert)
+       '("I" . meow-open-above)
+       '("j" . meow-next)
+       '("J" . meow-next-expand)
+       '("k" . meow-prev)
+       '("K" . meow-prev-expand)
+       '("l" . meow-right)
+       '("L" . meow-right-expand)
+       '("m" . meow-join)
+       '("n" . meow-search)
+       '("o" . meow-block)
+       '("O" . meow-to-block)
+       '("p" . meow-yank)
+       '("q" . meow-quit)
+       '("Q" . meow-goto-line)
+       '("r" . meow-replace)
+       '("R" . meow-swap-grab)
+       '("s" . meow-kill)
+       '("t" . meow-till)
+       '("u" . meow-undo)
+       '("U" . meow-undo-in-selection)
+       '("v" . meow-visit)
+       '("w" . meow-mark-word)
+       '("W" . meow-mark-symbol)
+       '("x" . meow-line)
+       '("X" . meow-goto-line)
+       '("y" . meow-save)
+       '("Y" . meow-sync-grab)
+       '("z" . meow-pop-selection)
+       '("'" . repeat)
+       '("<escape>" . ignore)
+       '("SPC" . meow-keypad))
+
+      (meow-leader-define-key
+       '("1" . meow-digit-argument)
+       '("2" . meow-digit-argument)
+       '("3" . meow-digit-argument)
+       '("4" . meow-digit-argument)
+       '("5" . meow-digit-argument)
+       '("6" . meow-digit-argument)
+       '("7" . meow-digit-argument)
+       '("8" . meow-digit-argument)
+       '("9" . meow-digit-argument)
+       '("0" . meow-digit-argument)
+       '("SPC" . execute-extended-command)
+       '("." . find-file)
+       '("," . consult-buffer)
+       '("/" . meow-keypad-describe-key)
+       '("?" . meow-cheatsheet)))
+    
+    (meow-setup)
+    (meow-global-mode 1))
+#+end_src
+
+** TODO Dired
+#+begin_src emacs-lisp
+  (use-package dired
+    :straight (:type built-in)
+    :hook
+    (dired-mode . dired-hide-details-mode)
+    :bind (:map dired-mode-map
+    	      ("." . dired-hide-details-mode)
+  	      ("M-<up>" . dired-up-directory)
+  	      ("M-<left>" . dired-prev-dirline)
+  	      ("M-<right>" . dired-next-dirline)
+  	      ("<mouse-2>" . dired-mouse-find-file))
+    :custom
+    (dired-auto-revert-buffer t)
+    (dired-recursive-copies 'always)
+    (dired-recursive-deletes 'always)
+    :config
+    (defun abi/dired-mode-setup ()
+      "Disable font-lock for remote dired buffers."
+      (when (file-remote-p default-directory)
+        ;; Use simpler listing for faster remote display
+        ;;(setq-local dired-listing-switches "-la")
+        
+        ;; Disable expensive features
+        (setq-local dired-hide-details-mode t)
+        (setq-local dired-auto-revert-buffer nil)
+        
+        ;; Use cached file attributes
+        (setq-local dired-use-ls-dired 'unspecified)
+        
+        ;; Show less info for faster loading
+        (setq-local dired-dwim-target nil)
+      
+        (font-lock-mode -1)))
+    
+    (add-hook 'dired-mode-hook #'abi/dired-mode-setup))
+#+end_src
+
+Useful additions/extensions from =dired-hacks.=
+https://github.com/Fuco1/dired-hacks
+#+begin_src emacs-lisp
+  (use-package dired-subtree
+    :after dired
+    :straight (dired-subtree
+  	     :type git
+  	     :host github
+  	     :repo "Fuco1/dired-hacks"
+  	     :files ("dired-subtree.el" "dired-subtree-pkg.el"))
+    :bind (:map dired-mode-map
+  	      ("<tab>" . dired-subtree-toggle)
+  	      ("<backtab>" . dired-subtree-cycle)))
+#+end_src
+
+** TODO Shells
+*** Comint
+#+begin_src emacs-lisp
+  (use-package comint
+    :straight (:type built-in)
+    :defer t
+    :preface
+    (defun abi/comint-make-output-read-only (output)
+      "Make comint output read-only."
+      (propertize output 'read-only t))
+
+    (defun abi/comint-clear-command (input)
+      "Intercept 'clear' command and clear the buffer."
+      (when (string-match-p "\\`clear\\s-*\\'" input)
+        (comint-clear-buffer)
+        ""))
+
+    (defun abi/comint-clear-scrollback-buffer ()
+      "Replicate the classic 'Ctrl+l' scrollback clearing functionality."
+      (interactive)
+      (let ((comint-buffer-maximum-size 0))
+        (comint-truncate-buffer)))
+
+    :custom
+    (comint-scroll-show-maximum-output nil)
+    (comint-highlight-input nil)
+    (comint-input-ignoredups t)
+    (comint-process-echoes t)
+    (comint-prompt-read-only t)
+    
+    :hook
+    (comint-mode .
+                 (lambda ()
+  		 (add-hook 'comint-preoutput-filter-functions
+                             #'abi/comint-make-output-read-only
+                             nil t)))
+    (comint-input-filter-functions . abi/comint-clear-command)
+
+    :bind
+    (:map comint-mode-map
+  	("C-l" . abi/comint-clear-scrollback-buffer)))
+#+end_src
+
+*** Shell-mode
+Sane defaults for =shell-mode=.
+#+begin_src emacs-lisp
+  (use-package shell
+    :straight (:type built-in)
+    :defer t
+    :preface
+    (defun abi/shell (n)
+      (interactive "P")
+      (let* ((num (and n (prefix-numeric-value n)))
+             (buf-name (if num (format "*shell<%d>*" num) "*shell*")))
+        (shell buf-name)))
+
+    (defun abi/shell-cleanup-on-exit ()
+      (when-let ((proc (get-buffer-process (current-buffer))))
+        (set-process-query-on-exit-flag proc nil)
+        (set-process-sentinel
+         proc
+         (lambda (process event)
+  	 (when (string-match-p "\\(finished\\|exited\\|terminated\\)" event)
+             (when-let ((buf (process-buffer process)))
+               (kill-buffer buf)))))))
+
+    :custom
+    ;; PERF(abi): fix process slowness issues.
+    ;; https://tfree87.github.io/.emacs.d/init.html#orgaf64369
+    (process-adaptive-read-buffering nil)
+    (read-process-output-max (* 4 1024 1024))
+
+    :hook
+    (shell-mode . abi/shell-cleanup-on-exit)
+
+    :bind
+    ("C-c s s" . abi/shell))
+#+end_src
+
+TODO(abi): integrate into the use-package snippet above.
+I do like my colored prompt and output, but supposedly font-locking does affect performance.
+#+begin_src emacs-lisp :tangle no
+  ;; PERF(abi): disable font-locking in shell buffers.
+  (add-hook 'shell-mode-hook
+            (lambda (&rest _)
+              (font-lock-mode -1)
+              ;; Prevent it from getting re-enabled
+              (make-local-variable 'font-lock-function)
+              (setq font-lock-function (lambda (&rest _)
+                                         nil))))
+#+end_src
+
+TODO(abi): integrate into the use-package snippet above.
+Make =Powershell 7= the default shell on Windows.
+#+begin_src emacs-lisp
+  (when (eq system-type 'windows-nt)
+    (let ((pwsh "C:\\Program Files\\PowerShell\\7\\pwsh.exe"))
+      (if (file-exists-p pwsh)
+          (setq explicit-shell-file-name pwsh
+                explicit-pwsh.exe-args '("-NoLogo"))
+        (setq explicit-shell-file-name "powershell.exe"
+              explicit-powershell.exe-args '("-NoLogo")))))
+#+end_src
+
+*** TODO Eshell
+=Eshell= is built-in, and it can leverage the full power of Emacs.
+#+begin_src emacs-lisp
+  (use-package eshell
+    :bind ("C-c s e" . eshell)
+    :preface
+    (defun abi/eshell-comint-clear-buffer ()
+      "Clear the `eshell' buffer while preserving typed input."
+      (interactive)
+      (let ((inhibit-read-only t))
+        (let ((input (eshell-get-old-input)))
+          (eshell/clear-scrollback)
+          (eshell-emit-prompt)
+          (when (and input (not (string-empty-p input)))
+            (insert input)))))
+    
+    ;; Prompt customization functions
+    (defmacro with-face (STR &rest PROPS)
+      "Return STR propertized with PROPS."
+      `(propertize ,STR 'face (list ,@PROPS)))
+
+    (defmacro esh-section (NAME ICON FORM DELIM &rest PROPS)
+      "Build eshell section NAME with optional ICON, FORM content, and trailing DELIM with PROPS.
+      ICON can be:
+        - A string.
+        - A function call.
+        - nil (no icon at all)."
+      `(setq ,NAME
+             (lambda () 
+               (when ,FORM
+                 (concat (with-face 
+                          ,(if ICON
+                               `(concat ,ICON " " ,FORM)
+                             FORM)
+                          ,@PROPS)
+      		       (propertize ,DELIM 'face '(:foreground "gray")))))))
+    
+    (defun esh-acc (acc x)
+      "Accumulator for evaluating and concatenating esh-sections."
+      (if-let ((result (funcall x)))
+          (concat acc result)
+        acc))
+
+    (defun esh-prompt-func ()
+      "Build `eshell-prompt-function'"
+      (concat (or esh-header "\n ")
+              (if (and (boundp 'eshell-funcs) eshell-funcs)
+  		(seq-reduce #'esh-acc eshell-funcs "")
+                "")))
+
+    :init
+    ;; Prompt configuration variables
+    (setq esh-sep "  ")
+    (setq esh-section-delim "|")
+    (setq esh-header "\n ")
+    (setq eshell-funcs nil)
+
+    :custom
+    (eshell-banner-message "")
+    (eshell-prompt-regexp "^[^]* ")
+    (eshell-prompt-function 'esh-prompt-func)
+    (eshell-history-size 10000)
+    (eshell-hist-ignoredups t)
+    (eshell-scroll-to-bottom-on-input 'this)
+    (eshell-scroll-to-bottom-on-output 'this)
+
+    :config
+    ;; Define prompt sections
+    (with-eval-after-load 'nerd-icons
+
+      (esh-section esh-login-user
+         		 nil
+           	 (user-login-name)
+           	 " | "
+           	 '(:foreground "#b48ead"))
+      
+      (esh-section esh-working-dir
+           	 ;; (nerd-icons-faicon "nf-fa-folder_open")
+         		 nil
+           	 (abbreviate-file-name (eshell/pwd))
+           	 " | "
+           	 '(:foreground "#8fbcbb"))
+      
+      (esh-section esh-git
+           	 ;; (nerd-icons-devicon "nf-dev-git")
+         		 ""
+           	 (when-let* ((git-dir (locate-dominating-file default-directory ".git"))
+                               (head-file (expand-file-name ".git/HEAD" git-dir)))
+                     (when (file-exists-p head-file)
+                       (with-temp-buffer
+  		       (insert-file-contents head-file)
+  		       (goto-char (point-min))
+  		       (when (looking-at "ref: refs/heads/\\(.+\\)")
+           		 (match-string 1)))))
+     		 " "
+           	 '(:foreground "#ebcb8b"))
+
+      (esh-section esh-arrow
+  		 nil
+  		 " "
+  		 "")
+
+      (setq eshell-funcs (list esh-login-user esh-working-dir esh-git esh-arrow)))
+
+    :hook
+    (eshell-mode . (lambda (&rest _)
+                     (local-set-key (kbd "C-l") 'abi/eshell-comint-clear-buffer))))
+#+end_src
+
+TODO(abi): check the backend needed for this!
+Add fish-like autosuggestions based on history.
+#+begin_src emacs-lisp :tangle no
+  (use-package esh-autosuggest
+    :hook (eshell-mode . esh-autosuggest-mode))
+#+end_src
+
+*** Eat: Emulate A Terminal
+#+begin_src emacs-lisp
+  (use-package eat
+    :straight (eat
+  	     :type git
+  	     :host codeberg
+  	     :repo "akib/emacs-eat"
+  	     :files ("*.el" ("term" "term/*.el") "*.texi"
+  		     "*.ti" ("terminfo/e" "terminfo/e/*")
+  		     ("terminfo/65" "terminfo/65/*")
+  		     ("integration" "integration/*")
+  		     (:exclude ".dir-locals.el" "*-tests.el")))
+    :bind ("C-c s t" . eat))
+#+end_src
+
+*** Disable =hl-line-mode= in shell and terminal buffers
+#+begin_src emacs-lisp
+  (defun abi/disable-hl-line-in-shells ()
+    "Disable hl-line-mode in shell and terminal modes."
+    (when hl-line-mode
+      (hl-line-mode -1))
+    (when (bound-and-true-p global-hl-line-mode)
+      (setq-local global-hl-line-mode nil)))
+
+  (dolist (hook '(eshell-mode-hook
+                  shell-mode-hook
+                  term-mode-hook
+                  vterm-mode-hook
+                  eat-mode-hook
+                  comint-mode-hook))
+    (add-hook hook #'abi/disable-hl-line-in-shells))
+#+end_src
+
+* QUALITY OF LIFE
+** Better help buffers
+=Helpful= provides more contextual information than the built-in =*Help*= buffers, while trying to show code snippets, symbols, keymaps and prettyfing things along the way.
+#+begin_src emacs-lisp
+  (use-package helpful
+    :bind
+    ("C-h f" . helpful-callable)        ;; Functions & macros
+    ("C-h F" . helpful-function)        ;; Only functions
+    ("C-h x" . helpful-command)         ;; Only interactive functions
+    ("C-h v" . helpful-variable)
+    ("C-h k" . helpful-key)
+    ("C-h '" . helpful-at-point))
+#+end_src
+
+Display help buffers in the active window, don't create a new one.
+#+begin_src emacs-lisp
+  (add-to-list 'display-buffer-alist
+               '("*Help*" display-buffer-same-window))
+#+end_src
+
+** Keymap cheatsheets
+#+begin_src emacs-lisp
+  (use-package which-key
+    :straight (:type built-in)
+    :defer 3
+    :after meow
+    :diminish which-key-mode
+    :custom
+    (which-key-show-early-on-C-h t)
+    (which-key-idle-delay 0.25)
+    (which-key-idle-secondary-delay 0.02)
+    :config
+    (which-key-mode t)
+
+    (with-eval-after-load 'meow
+      (when (boundp 'meow-leader-keymap)
+        (which-key-add-key-based-replacements meow-leader-keymap
+  	"f" "files"
+  	"b" "buffers"
+  	"w" "windows"
+  	"p" "project"
+  	"g" "git"
+  	"l" "lsp"
+  	"l p" "peek"
+  	"l h" "hierarchy"
+  	"l w" "workspace"
+  	"e" "errors"
+  	"s" "shells"
+  	"m" "build/cmake"
+  	"o" "org"
+  	"n" "notes/news"
+  	"a" "avy"
+  	"a c" "char"
+  	"a l" "line"
+  	"a r" "region"
+  	"r" "region/expand"
+  	"t" "toggles"))))
+#+end_src
+
+** TODO Documentation hints
+#+begin_src emacs-lisp
+  (use-package eldoc
+    :ensure nil
+    :diminish eldoc-mode
+    :hook
+    (emacs-lisp-mode c-ts-mode c++-ts-mode)
+    :custom
+    (eldoc-echo-area-use-multiline-p nil)
+    (eldoc-idle-delay 0.4))
+#+end_src
+** Golden ratio windows
+#+begin_src emacs-lisp
+  (use-package golden-ratio
+    :defer t
+    :custom
+    (golden-ratio-exclude-buffer-names '("*MINIMAP*"))
+    :hook
+    (after-init . golden-ratio-mode)
+    :config
+    ;; Exclude `which-key' buffer window
+    (with-eval-after-load "which-key"
+      (add-to-list 'golden-ratio-inhibit-functions
+  		 (lambda ()
+                     (and which-key--buffer
+  			(window-live-p (get-buffer-window which-key--buffer))))))
+
+    ;; Exclude `minimap' buffer window
+    (with-eval-after-load "minimap"
+      (add-to-list 'golden-ratio-inhibit-functions
+  		 (lambda ()
+                     (and minimap-buffer-name
+  			(window-live-p (get-buffer-window minimap-buffer-name)))))))
+#+end_src
+
+** Better buffer names
+#+begin_src emacs-lisp
+  (use-package uniquify
+    :straight (:type built-in)
+    :defer t
+    :custom
+    (uniquify-buffer-name-style 'forward)
+    (uniquify-separator "/")
+    (uniquify-after-kill-buffer-p t))
+#+end_src
+
+** Buffer management
+*** Basic bindings
+#+begin_src emacs-lisp
+  (bind-key "C-c b r" 'revert-buffer)
+  (bind-key "C-c b e" 'eval-buffer)
+  (bind-key "C-c b k" 'kill-current-buffer)
+  (bind-key "C-x k" 'kill-current-buffer)
+  (bind-key "C-c b K" 'kill-buffer)
+#+end_src
+
+*** Buffer switching
+Quickly switch back & forth between buffers.
+#+begin_src emacs-lisp
+  (use-package buffer-flip
+    :bind
+    ("C-c b n" . buffer-flip-forward)
+    ("C-c b p" . buffer-flip-backward)
+    ("C-<tab>" . buffer-flip-forward)
+    ("C-S-<tab>" . buffer-flip-backward))
+#+end_src
+
+*** Buffer popups
+#+begin_src emacs-lisp
+  (use-package popper
+    :bind (("C-ñ" . popper-cycle))
+    :init
+    (setq popper-reference-buffers
+          '("\\*Messages\\*"
+  	  "Output\\*$"
+  	  "\\*Package-Lint\\*"
+  	  "\\*Checkdoc Status\\*"
+  	  help-mode
+  	  compilation-mode
+  	  "^\\*eshell.*\\*$" eshell-mode
+            "^\\*shell.*\\*$"  shell-mode
+            "^\\*term.*\\*$"   term-mode
+            "^\\*vterm.*\\*$"  vterm-mode
+            "^\\*eat.*\\*$"  eat-mode  	  
+            ))
+    ;;(setq popper-group-function #'popper-group-by-projectile)
+    (setq popper-mode-line nil)
+    (popper-mode 1))
+#+end_src
+
+** File management
+Essential operations.
+#+begin_src emacs-lisp
+  (use-package files
+    :straight (:type built-in)
+    :bind (("C-c f f" . find-file)
+  	 ("C-c f F" . find-file-other-window)
+  	 ("C-c f s" . save-buffer)
+  	 ("C-c f S" . write-file)
+  	 ("C-s" . save-buffer)
+  	 ("C-S-s" . write-file)))
+#+end_src
+ 
+Edit as root user.
+#+begin_src emacs-lisp
+  (use-package sudo-edit
+    :bind ("C-c f u" . sudo-edit))
+#+end_src
+
+Show file details in a posframe. It also allows to quickly copy them.
+#+begin_src emacs-lisp
+  (use-package file-info
+    :bind ("C-c f i" . file-info-show)
+    :custom
+    (hydra-hint-display-type 'posframe)
+    (hydra-posframe-show-params `(:poshandler posframe-poshandler-frame-center
+                                              :internal-border-width 3
+                                              :internal-border-color "#CFA980"
+                                              :left-fringe 40
+                                              :right-fringe 40)))
+#+end_src
+
+Keep a log of recently visited files so that we can quickly access them again.
+#+begin_src emacs-lisp
+  (use-package recentf
+    :ensure nil
+    :bind ("\C-x\ \C-r" . recentf-open)
+    :custom
+    (recentf-max-menu-items 75)
+    (recentf-auto-cleanup 'never)
+    :config
+    ;; Exclude configuration files & persistent data managed by `no-littering'
+    (add-to-list 'recentf-exclude (format "%s\\config\\emacs\\.*" (getenv "HOME")))
+    ;; (add-to-list 'recentf-exclude
+    ;; (recentf-expand-file-name no-littering-var-directory))
+    ;; (add-to-list 'recentf-exclude
+    ;; (recentf-expand-file-name no-littering-etc-directory))
+    ;; Save list every 5 min
+    (run-at-time nil 300 'recentf-save-list)
+    (recentf-mode 1))
+#+end_src
+
+** Undo system
+Simpler, linear undo/redo & increased storage limits.
+#+begin_src emacs-lisp
+  (use-package undo-fu
+    :custom
+    (undo-limit 67108864)
+    (undo-strong-limit 100663296)
+    (undo-outer-limit 1006632960)
+    :config
+    (bind-key* "C-z" 'undo-fu-only-undo)
+    (bind-key* "C-r" 'undo-fu-only-redo))
+#+end_src
+
+** TODO Whitespace
+For programming buffers we can have Emacs do the heavy lifting and clean whitespaces before saving.
+#+begin_src emacs-lisp :tangle no
+  (use-package ws-butler
+    :straight (ws-butler
+  	     :type git
+  	     :host github
+  	     :repo "lewang/ws-butler")
+    :defer 3
+    :init
+    (add-hook 'prog-mode-hook #'ws-butler-mode)
+    :config
+    (setq ws-butler-keep-whitespace-before-point nil)
+    (ws-butler-global-mode 1))
+#+end_src
+
+Sometimes it can be useful to see whitespace indicators.
+#+begin_src emacs-lisp
+  (use-package whitespace
+    :ensure nil
+    :config
+    (delete 'newline-mark whitespace-style)
+    (delete 'lines whitespace-style)
+    ;; NOTE(abi): `bind-key*' to override any minor mode that also binds this key.
+    (bind-key* (kbd "C-c t w") #'(lambda (&rest _)
+  				 (interactive)
+  				 (whitespace-mode 'toggle))))
+#+end_src
+
+Add a newline at EOF, as all text files should have under Unix.
+#+begin_src emacs-lisp
+  (setq require-final-newline t)
+#+end_src
+
+** Moving lines/regions around
+#+begin_src emacs-lisp
+  (use-package drag-stuff
+    :diminish drag-stuff-mode
+    :bind (("M-S-k" . drag-stuff-up)
+  	 ("M-S-j" . drag-stuff-down))
+    :config
+    (drag-stuff-global-mode 1))
+#+end_src
+
+** Quick jumps
+With =avy= we can jump to / copy visible text.
+#+begin_src emacs-lisp
+  (use-package avy
+    :bind (("C-c a c" . avy-goto-char)
+  	 ("C-c a C" . avy-goto-char-in-line)
+           ("C-c a l" . avy-goto-line)
+  	 ("C-c a L" . avy-kill-whole-line)
+           ("C-c a r c" . avy-copy-region)
+           ("C-c a r m" . avy-copy-region)
+           ("C-c a r k" . avy-kill-region)
+           ("C-c a r t" . avy-transpose-lines-in-region)))
+#+end_src
+
+** TODO Session persistence
+Automatically save and restore the Emacs workspace across sessions. This includes open buffers, window layouts, modes, etc.
+#+begin_src emacs-lisp :tangle no
+  (use-package desktop
+    :straight (:type built-in)
+    :custom (desktop-save t)
+    :config (desktop-save-mode 1))
+#+end_src
+
+#+begin_src emacs-lisp :tangle no
+  (use-package activities
+    :init
+    (activities-mode)
+    (activities-tabs-mode)
+    ;; Prevent `edebug' default bindings from interfering.
+    (setq edebug-inhibit-emacs-lisp-mode-bindings t)
+    :bind
+    (("C-x C-a C-n" . activities-new)
+     ("C-x C-a C-d" . activities-define)
+     ("C-x C-a C-a" . activities-resume)
+     ("C-x C-a C-s" . activities-suspend)
+     ("C-x C-a C-k" . activities-kill)
+     ("C-x C-a RET" . activities-switch)
+     ("C-x C-a b" . activities-switch-buffer)
+     ("C-x C-a g" . activities-revert)
+     ("C-x C-a l" . activities-list)))
+#+end_src
+
+Preserve the contents of scratch buffers across sessions as well.
+#+begin_src emacs-lisp
+  (use-package persistent-scratch
+    :config
+    (persistent-scratch-setup-default))
+#+end_src
+
+** Server
+Let's make the current process act as a server for =emacsclient= instances, if no other Emacs is running as a daemon.
+#+begin_src emacs-lisp
+  (use-package server
+    :straight (:type built-in)
+    :commands (server-running-p)
+    :init (unless (server-running-p)
+  	  (server-start)))
+#+end_src
+
+* PROGRAMMING
+** TODO Path
+Ensure Emacs has the same PATH as your shell.
+TODO(abi): review if we need this!
+#+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :config (exec-path-from-shell-initialize))
+#+end_src
+
+** Environment variables
+The =$HOME= environment variable is usually not defined on Windows. Not by default anyway. Let's define it locally, since a lot of UNIX tools rely on it.
+#+begin_src emacs-lisp
+  (when (eq system-type (or 'cygwin 'windows-nt 'ms-dos))
+    (when-let (win-home
+               (and (null (getenv-internal "HOME"))
+                    (getenv "USERPROFILE")))
+      (setenv "HOME" win-home)
+      (setq abbreviated-home-dir nil)))
+#+end_src
+
+IMPORTANT(abi): MSVC & Windows SDK environment variables get set in the shell's profile, Since we don't always fire up Emacs from within the terminal, we need to set these here as well.
+#+begin_src emacs-lisp
+  (when (eq system-type 'windows-nt)
+    ;; Hardcode versions, architecture and paths
+    (let* ((MSVC_VERSION "14.38.33130")
+           (MSVC_HOST "Hostx64")
+           (MSVC_ARCH "x64")
+           (SDK_VERSION "10.0.22621.0")
+           (SDK_ARCH "x64")
+           (BIN_ROOT "C:\\bin\\msvc")
+           (MSVC_ROOT (concat BIN_ROOT "\\VC\\Tools\\MSVC\\" MSVC_VERSION))
+           (SDK_INCLUDE (concat BIN_ROOT "\\Windows Kits\\10\\Include\\" SDK_VERSION))
+           (SDK_LIBS (concat BIN_ROOT "\\Windows Kits\\10\\Lib\\" SDK_VERSION))
+
+           ;; Construct environment variables
+           (ENV_VAR_MSVC_ROOT (concat MSVC_ROOT "\\"))
+           (ENV_VAR_PATH (concat MSVC_ROOT "\\bin\\" MSVC_HOST "\\" MSVC_ARCH ";"
+                                 BIN_ROOT "\\Windows Kits\\10\\bin\\" SDK_VERSION "\\"
+                                 SDK_ARCH ";" BIN_ROOT "\\Windows Kits\\10\\bin\\"
+                                 SDK_VERSION "\\" SDK_ARCH "\\ucrt;" (getenv "PATH")))
+           (ENV_VAR_INCLUDE (concat MSVC_ROOT "\\include;" SDK_INCLUDE "\\ucrt;"
+                                    SDK_INCLUDE "\\shared;" SDK_INCLUDE "\\um;" SDK_INCLUDE
+                                    "\\winrt;" SDK_INCLUDE "\\cppwinrt;" (getenv "INCLUDE")))
+           (ENV_VAR_LIB (concat MSVC_ROOT "\\lib\\" MSVC_ARCH ";" SDK_LIBS "\\ucrt\\"
+                                SDK_ARCH ";" SDK_LIBS "\\um\\" SDK_ARCH ";" (getenv "LIB"))))
+
+      ;; NOTE(abi): `compilation-environment' expects a list in "var=value" format.
+      (setenv "VCToolsInstallDir" ENV_VAR_MSVC_ROOT)
+      (setenv "PATH" ENV_VAR_PATH)
+      (setenv "INCLUDE" ENV_VAR_INCLUDE)
+      (setenv "LIB" ENV_VAR_LIB)))
+#+end_src
+
+** TODO Local variables
+Marking safe local variables
+https://discourse.doomemacs.org/t/file-and-directory-local-settings/161
+#+begin_src emacs-lisp
+  ;; Caching variables can be one the two canonical boolean values
+  (put 'projectile-enable-caching 'safe-local-variable 'booleanp)
+  (put 'projectile-project-enable-cmd-caching 'safe-local-variable 'booleanp)
+
+  ;; IMPORTANT(abi): make projectile commands accept only string values. Even if caching
+  ;; commands is enabled, we can see what command will be executed on the first run.
+  (put 'projectile-project-name 'safe-local-variable 'stringp)
+  (put 'projectile-project-root 'safe-local-variable 'stringp)
+  (put 'projectile-project-configure-cmd 'safe-local-variable 'stringp)
+  (put 'projectile-project-compilation-cmd 'safe-local-variable 'stringp)
+  (put 'projectile-project-run-cmd 'safe-local-variable 'stringp)
+
+  ;; Ignore unsafe variables, else don't prompt
+  (setq enable-local-variables :safe)
+#+end_src
+
+BUG(abi): figure out what's going on with =.dir-locals.el= and some major modes.
+https://stackoverflow.com/questions/19280851/how-to-keep-dir-local-variables-when-switching-major-modes
+#+begin_src emacs-lisp :tangle no
+  (add-hook 'after-change-major-mode-hook 'hack-local-variables)
+
+  ;; Keep track of when `projectile-project-configure-cmd' gets changed.
+  (add-variable-watcher 'projectile-project-configure-cmd
+                        (lambda (&rest x)
+                          (message "[DEBUG]: configure command changed by: %S" x)))
+#+end_src
+
+** Compilation
+#+begin_src emacs-lisp
+  (use-package compile
+    :ensure nil
+    :init
+    (defun abi/compile-auto-close-window (compilation-buffer process-exit-string)
+      "Close compilation window 2 seconds after a successful build, if still open."
+      (when (and (not (string-match ".*exited abnormally.*" process-exit-string))
+                 (not (with-current-buffer compilation-buffer
+                        (goto-char (point-min))
+                        (search-forward "warning" nil t))))
+        (message "[INFO]: successful build — closing window in 2s.")
+        (run-at-time "2 sec" nil
+  		   (lambda ()
+                       (when-let ((win (get-buffer-window compilation-buffer)))
+                         (delete-window win))))))
+    :custom
+    (compilation-scroll-output 'first-error)
+    (compilation-environment '("TERM=eterm-color"))
+    :hook
+    (compilation-finish-functions . abi/compile-auto-close-window))
+#+end_src
+
+Translate ANSI escape sequences into faces, i.e., colored output.
+#+begin_src emacs-lisp
+  (use-package ansi-color
+    :ensure nil
+    :hook (compilation-filter . ansi-color-compilation-filter))
+#+end_src
+
+It is possible to set environment variables specifically for compilation.
+NOTE(abi): it seems like we need these to be set globally after all, so that =clangd= can track down headers from within an emacs session. This might still come in handy for other toolchains, so I'll keep it around for reference.
+#+begin_src emacs-lisp :tangle no
+  ;; IMPORTANT(abi): MSVC & Windows SDK environment variables get set in the shell's profile,
+  ;; so compiling by hand via `shell' works just fine, but it is tedious. We would like to use
+  ;; `projectile-compile-project' instead. By defining a custom `compilation-environment' we
+  ;; can prepend environment variables to `process-environment'.
+  ;;
+  ;; Alternatively, this could be solved in a less convoluted manner through a series of
+  ;; `setenv' calls or even modifying `exec-path' directly (I think). By doing it this way
+  ;; though we don't contaminate the global environment to satisfy specific compilation
+  ;; toolchains.
+  (when (eq system-type 'windows-nt)
+    ;; Hardcode versions, architecture and paths
+    (let* ((MSVC_VERSION "14.38.33130")
+           (MSVC_HOST "Hostx64")
+           (MSVC_ARCH "x64")
+           (SDK_VERSION "10.0.22621.0")
+           (SDK_ARCH "x64")
+           (BIN_ROOT "C:\\bin\\msvc")
+           (MSVC_ROOT (concat BIN_ROOT "\\VC\\Tools\\MSVC\\" MSVC_VERSION))
+           (SDK_INCLUDE (concat BIN_ROOT "\\Windows Kits\\10\\Include\\" SDK_VERSION))
+           (SDK_LIBS (concat BIN_ROOT "\\Windows Kits\\10\\Lib\\" SDK_VERSION))
+
+           ;; Construct environment variables
+           (ENV_VAR_MSVC_ROOT (concat "VCToolsInstallDir=" MSVC_ROOT "\\"))
+           (ENV_VAR_PATH (concat "PATH=" MSVC_ROOT "\\bin\\" MSVC_HOST "\\" MSVC_ARCH ";"
+                                 BIN_ROOT "\\Windows Kits\\10\\bin\\" SDK_VERSION "\\"
+                                 SDK_ARCH ";" BIN_ROOT "\\Windows Kits\\10\\bin\\"
+                                 SDK_VERSION "\\" SDK_ARCH "\\ucrt;" (getenv "PATH")))
+           (ENV_VAR_INCLUDE (concat "INCLUDE=" MSVC_ROOT "\\include;" SDK_INCLUDE "\\ucrt;"
+                                    SDK_INCLUDE "\\shared;" SDK_INCLUDE "\\um;" SDK_INCLUDE
+                                    "\\winrt;" SDK_INCLUDE "\\cppwinrt;" (getenv "INCLUDE")))
+           (ENV_VAR_LIB (concat "LIB=" MSVC_ROOT "\\lib\\" MSVC_ARCH ";" SDK_LIBS "\\ucrt\\"
+                                SDK_ARCH ";" SDK_LIBS "\\um\\" SDK_ARCH ";" (getenv "LIB"))))
+
+      ;; NOTE(abi): `compilation-environment' expects a list in "var=value" format.
+      (setq compilation-environment `(,ENV_VAR_MSVC_ROOT
+                                      ,ENV_VAR_PATH
+                                      ,ENV_VAR_INCLUDE
+                                      ,ENV_VAR_LIB))))
+#+end_src
+
+TODO(abi): maybe turn this into a little package?
+#+begin_src emacs-lisp
+  (defvar-local cmake-presets
+      '(("Clang Debug"   . "clang-debug")
+        ("Clang Release" . "clang-release")
+        ("GCC Debug"     . "gcc-debug")
+        ("GCC Release"   . "gcc-release"))
+    "Available CMake presets for the current project.")
+
+  (defvar-local cmake-current-preset nil
+    "Active CMake preset for the current project.")
+
+  (defun abi/cmake-switch-preset ()
+    "Switch CMake preset for the current project."
+    (interactive)
+    (unless cmake-presets
+      (user-error "No CMake presets defined for this project"))
+    (let* ((preset-name (completing-read "Select preset: " cmake-presets nil t))
+           (preset (cdr (assoc preset-name cmake-presets))))
+      (setq-local cmake-current-preset preset)
+      (setq-local projectile-project-configure-cmd
+                  (format "cmake --preset %s" preset))
+      (setq-local projectile-project-compilation-cmd
+                  (format "cmake --build --preset %s" preset))
+      (setq-local projectile-project-run-cmd
+                  "./bin/examples/xor_gate")
+      (setq-local projectile-project-test-cmd
+                  (format "ctest --preset %s" preset))
+      (message "Switched to preset: %s" preset-name)))
+
+  (defun abi/cmake-show-preset ()
+    "Show active CMake preset for the current project."
+    (interactive)
+    (if cmake-current-preset
+        (message "Current preset: %s" cmake-current-preset)
+      (message "No CMake preset selected")))
+
+  (bind-key "C-c m s" 'abi/cmake-switch-preset)
+  (bind-key "C-c m S" 'abi/cmake-show-preset)
+#+end_src
+
+** Tree-sitter
+=Tree-sitter= is a parser generator and incremental parsing library. It can update the syntax tree on-the-fly; making for fast, efficient syntax highlighting, among other things.
+https://tree-sitter.github.io/tree-sitter/
+
+NOTE(abi): to check if a language grammar has been properly installed, you may use =treesit-language-available-p=.
+#+begin_src emacs-lisp
+  (use-package treesit
+    :straight (:type built-in)
+    :mode (("\\.rs\\'" . rust-ts-mode)
+  	 ("\\.lua\\'" . lua-ts-mode)
+  	 ("\\.js\\'"  . typescript-ts-mode)
+           ("\\.ts\\'"  . typescript-ts-mode)
+           ("\\.jsx\\'" . tsx-ts-mode)
+           ("\\.tsx\\'". tsx-ts-mode)
+           ("\\.mjs\\'" . typescript-ts-mode)
+           ("\\.mts\\'" . typescript-ts-mode)
+           ("\\.cjs\\'" . typescript-ts-mode)
+           ("\\.css\\'" . css-ts-mode)
+           ("\\.html\\'" . html-ts-mode)
+           ("\\.json\\'" . json-ts-mode)
+           ("\\.yaml\\'" . yaml-ts-mode)
+           ("\\.yml\\'" . yaml-ts-mode) 
+           ("\\.prisma\\'" . prisma-ts-mode)
+           ("\\.Dockerfile\\'" . dockerfile-ts-mode))
+    :preface
+    (defun abi/ts-install-language-grammars-async ()
+      "Asynchronously install language grammars specified by `treesit-language-source-alist'."
+      (interactive)
+      (let ((langs (seq-filter (lambda (lang)
+                                 (not (treesit-language-available-p lang)))
+                               (mapcar #'car treesit-language-source-alist))))
+        (when langs
+          (message "Installing missing tree-sitter language grammars: %s" langs)
+          (dolist (lang langs)
+            (let* ((proc-name (format "ts-install-%s" lang))
+                   (buf-name (format "*ts-install-%s*" lang))
+                   (eval-form `(progn
+                                 (require 'treesit)
+                                 (setq treesit-language-source-alist
+                                       ',treesit-language-source-alist)
+                                 (treesit-install-language-grammar ',lang)))
+                   (proc (make-process
+                        	:name proc-name
+                        	:buffer buf-name
+                        	:command (list invocation-name "--batch" "-Q"
+                                         "--eval" (prin1-to-string eval-form))
+                        	:sentinel (lambda (p e)
+                                      (when (and (eq (process-status p) 'exit)
+                                                 (= (process-exit-status p) 0))
+                                        (message "`%s' grammar was installed."
+                                                 (process-get p 'lang)))))))
+              (process-put proc 'lang lang)
+              (message "Started async install for `%s`" lang))))))
+    :init
+    ;; Define the grammar sources before the package loads
+    (setq treesit-language-source-alist
+          '((elisp "https://github.com/Wilfred/tree-sitter-elisp")
+            (python . ("https://github.com/tree-sitter/tree-sitter-python" "v0.25.0"))
+      	  (lua . ("https://github.com/tree-sitter-grammars/tree-sitter-lua" "v0.4.0"))
+  	  (rust . ("https://github.com/tree-sitter/tree-sitter-rust" "v0.24.0"))
+  	  (c . ("https://github.com/tree-sitter/tree-sitter-c" "v0.24.1"))
+            (cpp . ("https://github.com/tree-sitter/tree-sitter-cpp" "v0.23.4"))
+      	  (make . ("https://github.com/tree-sitter-grammars/tree-sitter-make" "v1.1.1"))
+      	  (cmake . ("https://github.com/uyha/tree-sitter-cmake" "v0.7.2"))
+      	  (arduino . ("https://github.com/tree-sitter-grammars/tree-sitter-arduino" "v0.24.0"))
+      	  (glsl . ("https://github.com/tree-sitter-grammars/tree-sitter-glsl" "v0.2.0"))
+      	  (hlsl . ("https://github.com/tree-sitter-grammars/tree-sitter-hlsl" "v0.2.0"))
+  	  (cuda . ("https://github.com/tree-sitter-grammars/tree-sitter-cuda" "v0.21.1"))
+  	  (verilog . ("https://github.com/tree-sitter/tree-sitter-verilog" "v1.0.3"))
+  	  (odin . ("https://github.com/tree-sitter-grammars/tree-sitter-odin" "v1.3.0"))
+  	  (kotlin . ("https://github.com/tree-sitter-grammars/tree-sitter-kotlin" "v1.1.0"))
+    	  (c-sharp . ("https://github.com/tree-sitter/tree-sitter-c-sharp" "v0.23.1"))
+      	  (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.25.0"))
+            (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.23.2" "typescript/src"))
+            (tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.23.2" "tsx/src"))   
+      	  (html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.23.2"))
+            (css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.25.0"))
+            ;;(sql . ("https://github.com/DerekStride/tree-sitter-sql" "v0.3.11"))
+      	  (prisma . ("https://github.com/victorhqc/tree-sitter-prisma" "v1.6.0"))
+            (json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.24.8"))
+            (yaml . ("https://github.com/tree-sitter-grammars/tree-sitter-yaml" "v0.7.2"))
+      	  (toml . ("https://github.com/tree-sitter-grammars/tree-sitter-toml" "v0.7.0"))
+      	  (csv . ("https://github.com/tree-sitter-grammars/tree-sitter-csv" "v1.2.0" "csv/src"))
+      	  (xml . ("https://github.com/tree-sitter-grammars/tree-sitter-xml" "v0.7.0" "xml/src"))
+      	  (markdown . ("https://github.com/tree-sitter-grammars/tree-sitter-markdown" "v0.5.1" "tree-sitter-markdown/src"))
+      	  (dockerfile . ("https://github.com/camdencheek/tree-sitter-dockerfile" "v0.2.0"))
+      	  (bash . ("https://github.com/tree-sitter/tree-sitter-bash" "v0.25.0"))
+      	  ;; NOTE(abi): unsupported for now, see https://github.com/latex-lsp/tree-sitter-latex/issues/172.
+      	  ;; (latex . ("https://github.com/latex-lsp/tree-sitter-latex" "v0.6.0"))
+      	  (gitattributes . ("https://github.com/tree-sitter-grammars/tree-sitter-gitattributes" "v0.1.6"))))
+    
+    ;; Remap major modes to their tree-sitter equivalents
+    (dolist (mapping
+  	   '((python-mode . python-ts-mode)
+  	     (rust-mode . rust-ts-mode)
+               (c-mode . c-ts-mode)
+               (c++-mode . c++-ts-mode)
+               (c-or-c++-mode . c-or-c++-ts-mode)
+               ("CMakeLists\\.txt\\'" . cmake-ts-mode)
+               ("\\.cmake\\'" . cmake-ts-mode)
+               (csharp-mode . csharp-ts-mode)
+               (js-mode . typescript-ts-mode)
+               (js2-mode . typescript-ts-mode)
+               (typescript-mode . typescript-ts-mode)
+               (html-mode . html-ts-mode)
+               (css-mode . css-ts-mode)
+               ;;(sql-mode . sql-ts-mode)
+               (json-mode . json-ts-mode)
+               (js-json-mode . json-ts-mode)
+               (yaml-mode . yaml-ts-mode)
+               (bash-mode . bash-ts-mode)
+               (sh-mode . bash-ts-mode)
+               (sh-base-mode . bash-ts-mode)))
+      (add-to-list 'major-mode-remap-alist mapping))
+    :custom
+    (treesit-max-buffer-size (* 2048 1024 1024))
+    (c-ts-mode-indent-offset 4)
+    :config
+    (abi/ts-install-language-grammars-async))
+#+end_src
+
+** TODO Language Server Protocol
+LSP is an open protocol (JSON-RPC-based) that is widely used by code editors and IDEs to provide intelligent, language-specific features like code completion and the like.
+#+begin_src emacs-lisp
+    (use-package lsp-mode
+      :commands (lsp lsp-deferred)
+      :hook
+      ((lsp-mode . lsp-enable-which-key-integration)
+       ((c-ts-mode
+         c++-ts-mode
+         c-or-c++-ts-mode
+         python-base-mode
+         lua-ts-mode
+         typescript-ts-mode
+         tsx-ts-mode
+         rust-ts-mode) . lsp-deferred))
+
+      :preface
+      (defun abi/lsp-find-other-file-other-window ()
+        "Find the other file and open it in a split window."
+        (interactive)
+        (unless (bound-and-true-p lsp-mode)
+          (error "Not in lsp-mode"))
+        (let ((other-file (lsp-clangd-find-other-file)))
+          (when other-file
+    	(select-window (split-window-right))
+    	(find-file other-file))))
+
+      (defun abi/lsp-format-region-or-buffer ()
+        "Format the active region if selected, otherwise format the entire buffer."
+        (interactive)
+        (if (use-region-p)
+    	(lsp-format-region (region-beginning) (region-end))
+          (lsp-format-buffer)))
+
+      :bind
+      (
+       ;; Navigation
+       ("C-c l d" . lsp-find-definition)
+       ("C-c l t" . lsp-find-type-definition)
+       ("C-c l i" . lsp-find-implementation)
+       ("C-c l D" . lsp-find-declaration)
+       ("C-c l r" . lsp-find-references)
+       ("C-c l b" . xref-go-back)
+       ("C-c l f" . xref-go-forward)
+       ("C-c l R" . lsp-rename)
+       ("C-c l F" . abi/lsp-format-region-or-buffer)
+       ("C-c l a" . lsp-execute-code-action)
+       ("C-c l o" . lsp-clangd-find-other-file)
+       ("C-c l O" . abi/find-other-file-other-window)
+
+       ;; Peek
+       ("C-c l p d" . lsp-ui-peek-find-definitions)
+       ("C-c l p i" . lsp-ui-peek-find-implementation)
+       ("C-c l p r" . lsp-ui-peek-find-references)
+
+       ;; Code lens
+       ("C-c l l" . lsp-avy-lens)
+       
+       ;; Hierarchy
+       ("C-c l h c" . lsp-treemacs-call-hierarchy)
+       ("C-c l h t" . lsp-treemacs-type-hierchachy)
+       
+       ;; Documentation
+       ("C-c l t" . lsp-describe-thing-at-point)
+       ("C-c l s" . lsp-signature-activate)
+       
+       ;; Workspace
+       ("C-c l w r" . lsp-workspace-restart)
+       ("C-c l w s" . lsp-workspace-shutdown)
+       ("C-c l w f" . lsp-workspace-folders-add)
+       ("C-c l w d" . lsp-workspace-folders-remove)
+       )
+      
+      :custom
+      ;; General
+      (lsp-keymap-prefix "C-c l")
+      (lsp-idle-delay 0.25)
+      (lsp-auto-execute-action nil)
+      (lsp-log-io nil)
+      (lsp-semgrep-server-command nil)
+      (lsp-auto-guess-root t)
+      (lsp-keep-workspace-alive nil)
+      (lsp-restart 'auto-restart)
+      (lsp-enable-links nil)
+      (lsp-enable-folding nil)
+      (lsp-enable-imenu nil)
+      (lsp-enable-snippet nil)
+      (lsp-enable-file-watchers nil)
+      (lsp-enable-on-type-formatting nil)
+      (lsp-enable-symbol-highlighting t)
+      (lsp-semantic-tokens-enable nil)
+      (lsp-lens-enable t)
+      (lsp-signature-auto-activate nil)
+      (lsp-signature-render-documentation nil)
+      
+      ;; Modeline
+      (lsp-modeline-diagnostics-enable nil)
+      (lsp-modeline-code-actions-enable nil)
+      
+      ;; Headerline
+      (lsp-headerline-breadcrumb-enable nil)
+      (lsp-headerline-breadcrumb-icons-enable nil)
+      
+      ;; Eldoc
+      (lsp-eldoc-hook nil)
+      (lsp-eldoc-enable-hover nil)
+
+      ;; Remote clients
+      (lsp-auto-register-remote-clients nil)
+
+      :config
+      ;; Clangd
+      (with-eval-after-load 'lsp-clangd
+        (if (eq system-type 'windows-nt)
+          	(progn
+              (setq lsp-clangd-binary-path "C:\\bin\\LLVM\\bin\\clangd")
+              (setq lsp-clients-clangd-args '("--query-driver=*:\\**\\*"
+                                              "--header-insertion=never"
+                                              "--clang-tidy"
+                                              "--background-index"
+                                              "--completion-style=detailed"
+                                              "-j=4")))
+          
+          ;; Linux/Unix
+          (setq lsp-clangd-binary-path "/usr/bin/clangd")
+          (setq lsp-clients-clangd-args '("--header-insertion=never"
+                                          "--clang-tidy"
+                                          "--background-index"
+                                          "--completion-style=detailed"
+                                          "-j=4")))))
+#+end_src
+
+Higher level UI modules for =lsp-mode=, enabling features like code lenses, flycheck support, suggestions & documentation.
+#+begin_src emacs-lisp
+  (use-package lsp-ui
+    :commands lsp-ui-mode
+    ;; :custom
+    ;; Doc
+    ;; (lsp-ui-doc-enable nil)
+    ;; (lsp-ui-doc-show-with-mouse nil)
+    ;; (lsp-ui-doc-header t)
+    ;; (lsp-ui-doc-include-signature t)
+    ;; (lsp-ui-doc-enhanced-markdown nil)
+    ;; (lsp-ui-doc-delay 0.01)
+    ;; (lsp-ui-doc-border (face-foreground 'font-lock-comment-face))
+    ;; Sideline
+    ;; (lsp-ui-sideline-diagnostic-max-line-length 80)
+    ;; (lsp-ui-sideline-diagnostic-max-lines 2)
+    ;; (lsp-ui-sideline-show-code-actions t)
+    ;; (lsp-ui-sideline-delay 0.01)
+    ;; Peek
+    ;; (lsp-ui-peek-always-show t)
+    :config
+    ;; (custom-set-faces '(lsp-ui-sideline-global ((t (:height 0.75)))))
+    ;; (mapcar (lambda (f) (set-face-foreground f "yellow"))
+    ;; '(lsp-ui-sideline-code-action lsp-ui-sideline-current-symbol lsp-ui-sideline-symbol lsp-ui-sideline-symbol-info))
+
+    (progn
+      ;;
+      ;; 2022-03-28 - fix sideline height computation
+      ;;
+      (defun lsp-ui-sideline--compute-height nil
+        "Return a fixed size for text in sideline."
+        (let ((fontHeight (face-attribute 'lsp-ui-sideline-global :height)))
+          (if (null text-scale-mode-remapping)
+              '(height
+                (if (floatp fontHeight) fontHeight
+                  (/ (face-attribute 'lsp-ui-sideline-global :height) 100.0)
+                  )
+                ;; Readjust height when text-scale-mode is used
+                (list 'height
+                      (/ 1 (or (plist-get (cdr text-scale-mode-remapping) :height)
+                               1)))))))
+
+      ;;
+      ;; 2022-03-28 - fix sideline alignment
+      ;;
+      (defun lsp-ui-sideline--align (&rest lengths)
+        "Align sideline string by LENGTHS from the right of the window."
+        (list (* (window-font-width nil 'lsp-ui-sideline-global)
+                 (+ (apply '+ lengths) (if (display-graphic-p) 1 2)))))
+      )
+
+    ;; (set-face-attribute 'lsp-ui-sideline-global nil :italic t :height 0.7)
+    ;; (set-face-attribute 'lsp-ui-sideline-code-action nil :italic t :height 0.7)
+    ;; (set-face-attribute 'lsp-ui-sideline-symbol-info nil :italic t :height 0.7)
+    ;; (set-face-attribute 'lsp-ui-sideline-symbol nil :italic t :height 0.7)
+    ;; (set-face-attribute 'lsp-ui-sideline-current-symbol nil :italic t :height 0.7)
+
+    (set-face-attribute 'lsp-ui-sideline-global nil
+                        :italic t
+                        :height 0.8
+                        :background "#505050")
+
+    (set-face-attribute 'lsp-ui-sideline-code-action nil
+                        :italic t
+                        :height 0.8
+                        :background "#505050")
+
+    (set-face-attribute 'lsp-ui-sideline-symbol-info nil
+                        :italic t
+                        :height 0.8
+                        :background "#505050")
+
+    (set-face-attribute 'lsp-ui-sideline-symbol nil
+                        :italic t
+                        :height 0.8
+                        :background "#505050")
+
+    (set-face-attribute 'lsp-ui-sideline-current-symbol nil
+                        :italic t
+                        :height 0.8
+                        :background "#505050")
+
+    (when
+        (display-graphic-p)
+      (setq lsp-ui-doc-use-childframe t
+            lsp-ui-doc-text-scale-level -1.0
+            lsp-ui-doc-max-width 80
+            lsp-ui-doc-max-height 25
+            lsp-ui-doc-position 'at-point)
+      ))
+#+end_src
+
+*** Python.
+#+begin_src emacs-lisp
+  (use-package lsp-pyright
+    :custom (lsp-pyright-langserver-command "basedpyright")
+    :hook (python-mode . lsp-deferred)
+    :init (require 'lsp-pyright))
+#+end_src
+
+*** Java.
+#+begin_src emacs-lisp :tangle no
+  (use-package lsp-java
+    :after lsp)
+
+  (use-package java
+    :ensure nil
+    :after lsp-java
+    :bind (:map java-mode-map
+                ("C-c i" . lsp-java-add-import)))
+#+end_src
+
+*** Web Development
+**** TODO Linting
+https://emacs-lsp.github.io/lsp-mode/tutorials/reactjs-tutorial/#linting
+#+begin_src emacs-lisp :tangle no
+  (use-package lsp-eslint
+    :after lsp-mode)
+#+end_src
+
+**** TailwindCSS
+#+begin_src emacs-lisp
+  (use-package lsp-tailwindcss
+    :after lsp-mode
+    :init (setq lsp-tailwindcss-add-on-mode t)
+    :config
+    (dolist (tw-major-mode '(css-mode
+  			   css-ts-mode
+  			   typescript-mode
+  			   typescript-ts-mode
+  			   tsx-ts-mode
+  			   js2-mode
+  			   js-ts-mode
+  			   clojure-mode))
+      (add-to-list 'lsp-tailwindcss-major-modes tw-major-mode))) 
+#+end_src
+
+** Web Development
+#+begin_src emacs-lisp
+  (use-package typescript-ts-mode
+    :defer t
+    :hook (typescript-ts-base-mode . (lambda ()
+                                       (setq-local typescript-ts-indent-level 4
+                                                   typescript-ts-mode-indent-offset 4
+                                                   js-indent-level 4)))
+    :mode (("\\.tsx\\'" . tsx-ts-mode)
+           ("\\.js\\'"  . typescript-ts-mode)
+           ("\\.mjs\\'" . typescript-ts-mode)
+           ("\\.mts\\'" . typescript-ts-mode)
+           ("\\.cjs\\'" . typescript-ts-mode)
+           ("\\.ts\\'"  . typescript-ts-mode)
+           ("\\.jsx\\'" . tsx-ts-mode)))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package markdown-mode
+    :defer t
+    :commands (markdown-mode gfm-mode)
+    :mode (("README\\.md\\'" . gfm-mode)
+           ("\\.md\\'" . markdown-mode)
+           ("\\.markdown\\'" . markdown-mode))
+    :config
+    (setq markdown-fontify-code-blocks-natively t))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package nxml-mode
+    :straight (:type built-in)
+    :mode "\\.xml\\'"
+    :hook ((nxml-mode . setup-programming-mode)
+           (nxml-mode . colorful-mode)
+           (nxml-mode . display-line-numbers-mode)))
+#+end_src
+
+** Static analysis
+=Flycheck= provides modern, on-the-fly syntax checking out of the box.
+#+begin_src emacs-lisp
+    (use-package flycheck
+      :defer t
+      :hook 
+      (prog-mode . flycheck-mode)
+      :diminish t
+      :bind
+      ("C-c e n" . flycheck-next-error)
+      ("C-c e p" . flycheck-previous-error)
+      ("C-c e f" . flycheck-first-error)
+      ("C-c e l" . flycheck-list-errors)
+      ("C-c e c" . flycheck-compile)
+      ("C-c e C" . flycheck-clear)
+      ("C-c e b" . flycheck-buffer)
+      ("C-c e t" . flycheck-mode)
+      ("C-c e h" . flycheck-quick-help)
+      ("C-c e m" . flycheck-manual)
+      :custom
+      ;; NOTE(abi): by default `flycheck' checks new lines as well, but I find that too disruptive.
+      (flycheck-check-syntax-automatically '(save mode-enabled idle-change))
+      (flycheck-idle-buffer-switch-delay 0.75)
+      (flycheck-idle-change-delay 0.75)
+      (flycheck-emacs-lisp-load-path 'inherit)
+      (flycheck-indication-mode nil))
+#+end_src
+
+Sleek overlays for =flycheck/flymake=.
+#+begin_src emacs-lisp
+  (use-package flyover
+    :hook (flycheck-mode . flyover-mode)
+    :bind ("C-c e o" . flyover-toggle)
+    :custom
+    (flyover-virtual-line-icon " ─► ")
+    (flyover-background-lightness 25)
+    (flyover-percent-darker 60)
+    (flyover-text-tint-percent 70)
+    (flyover-text-tint 'lighter)
+    (flyover-hide-when-cursor-is-on-same-line t)
+    (flyover-show-at-eol t)
+    (flyover-wrap-messages t))
+#+end_src
+
+Linter for Emacs Lisp files metadata.
+#+begin_src emacs-lisp
+  (use-package package-lint
+    :defer t)
+#+end_src
+
+** TODO Auto-insert headers
+#+begin_src emacs-lisp :tangle no
+  (use-package autoinsert
+    :straight (:type built-in)
+    :demand nil
+    :custom
+    (auto-insert-query nil)
+    :hook
+    (find-file . auto-insert)
+    :config
+    (define-auto-insert
+      '(emacs-lisp-mode . "Emacs Lisp package header")
+      '("Short description: "
+        ";;; " (file-name-nondirectory buffer-file-name)
+        " --- " str
+        " -*- lexical-binding: t; -*-" \n
+        \n
+        ";; Copyright (C) " (format-time-string "%Y") " " (user-full-name) \n
+        \n
+        ";; Author: " (user-full-name) " <" user-mail-address ">" \n
+        ";; Version: 0.1.0" \n
+        ";; Package-Requires: ((emacs \"26.1\"))" \n
+        ";; Keywords: "
+        '(require 'finder)
+        (mapconcat #'identity
+    		 (completing-read-multiple
+    		  "Keywords: "
+    		  (mapcar (lambda (x) (symbol-name (car x)))
+    			  finder-known-keywords))
+    		 ", ")
+        \n
+        ";; URL: https://github.com/abidanBrito/" (file-name-sans-extension
+      						 (file-name-nondirectory buffer-file-name)) \n
+        ";; SPDX-License-Identifier: MIT" \n
+        \n
+        ";;; Commentary:" \n
+        \n
+        ";; " _ \n
+        \n
+        ";;; Code:" \n
+        \n
+        _ \n
+        \n
+        "(provide '"
+        (file-name-sans-extension
+         (file-name-nondirectory buffer-file-name))
+        ")" \n
+        ";;; " (file-name-nondirectory buffer-file-name)
+        " ends here" \n))
+    
+    (auto-insert-mode 1))
+#+end_src
+
+** Completion framework
+#+begin_src emacs-lisp
+  (use-package company
+    :hook ((prog-mode . company-mode)
+  	 (org-mode . company-mode)
+  	 (org-src-mode . company-mode))
+    :bind (:map company-active-map
+                ("C-n" . company-select-next)
+                ("C-p" . company-select-previous)
+                ("<tab>" . company-select-next)
+                ("<backtab>" . company-select-previous))
+    :custom
+    (company-idle-delay 0.0)
+    (company-minimum-prefix-length 1)
+    (company-selection-wrap-around t)
+    (company-tooltip-minimum-width 60)
+    (company-tooltip-maximum-width 60)
+    (company-tooltip-limit 5)
+    (company-tooltip-align-annotations t)
+    (company-frontends '(company-pseudo-tooltip-frontend company-echo-metadata-frontend)))
+
+  (use-package company-box
+    :if (display-graphic-p)
+    :requires company
+    :hook (company-mode . company-box-mode)
+    :custom
+    (company-box-frame-behavior 'default)
+    (company-box-scrollbar nil)
+    (company-box-doc-enable nil))
+#+end_src
+
+** TODO Project management
+TODO(abi): use =fd= or =rg= to find projects/files. Also add recursive search (with a custom depth value) given a path to automatically find projects. 
+#+begin_src emacs-lisp :tangle no
+  (use-package project
+    :straight (:type built-in)
+    :bind-keymap ("C-c p" . project-prefix-map)
+    :bind (:map project-prefix-map
+  	      ("p" . project-switch-project)
+  	      ("b" . project-switch-to-buffer)
+  	      ("f" . project-find-file)
+  	      ("d" . project-find-dir)
+  	      ("D" . project-dired)
+  	      ("c" . project-compile)
+  	      ("r" . project-recompile))
+    :custom
+    (project-switch-commands 'project-dired))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package projectile
+    :defer 3
+    :diminish projectile-mode
+    :bind-keymap
+    ("C-c p" . projectile-command-map)
+    :init
+    (setq projectile-switch-project-action #'projectile-dired)
+    (when (file-directory-p "~/dev/")
+      (setq projectile-project-search-path '(("~/dev/" . 3))))
+    :config
+    (projectile-mode 1))
+#+end_src
+
+** TODO Debugging
+#+begin_src emacs-lisp :tangle no
+  (use-package gud
+    :ensure nil
+    :init
+    (setq gdb-many-windows t
+          gdb-show-main t)
+    :preface
+    (defun gdb-run-continue (arg)
+      "Run or continue program with numeric argument ARG."
+      (interactive "p")
+      (when (boundp 'gdb-thread-number)
+        (if (eq gdb-thread-number nil)
+            (gud-run arg)
+          (gud-cont arg))))
+    :bind (:map gub-mode-map
+  	      ("C-x C-a" . gdb-run-continue)))
+#+end_src
+
+** Automatic indentation
+#+begin_src emacs-lisp :tangle no
+  (use-package aggressive-indent
+    :straight (aggressive-indent
+  	     :type git
+  	     :host github
+  	     :repo "Malabarba/aggressive-indent-mode")
+    :defer t
+    :hook (prog-mode . aggressive-indent-mode))
+#+end_src
+** Formatting
+=Alpheleia= leverages external CLI code formatters so that programming buffers get auto-formatted on save. It's fast, language-agnostic and, unlike similar packages and it keeps the point fixed in place. It does so by using [[https://web.archive.org/web/20220527003730/https://tools.ietf.org/doc/tcllib/html/rcs.html#section4][RCS patches]] and [[https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm][a very cool dynamic programming algorithm for string alignment]].
+#+begin_src emacs-lisp
+    (use-package apheleia
+      :bind ("M-F" . apheleia-format-buffer)
+      :config
+      ;; Python (ruff)
+      (dolist (mode '(python-mode python-ts-mode))
+        (setf (alist-get mode apheleia-mode-alist)
+        	  '(ruff-isort ruff)))
+
+      ;; JS/TS (biomeJS)
+      (setf (alist-get 'biome apheleia-formatters)
+    	'("apheleia-npx" "biome" "check"
+    	  "--fix"
+              "--stdin-file-path" filepath))
+      (dolist (mode '(js-mode js-ts-mode js-jsx-mode rjsx-mode typescript-mode typescript-ts-mode tsx-ts-mode))
+        (setf (alist-get mode apheleia-mode-alist)
+        	  'biome))
+
+      ;; Rust (rustfmt)
+      (setf (alist-get 'rust-mode apheleia-mode-alist) 'rustfmt)
+      (setf (alist-get 'rust-ts-mode apheleia-mode-alist) 'rustfmt)
+      :hook (prog-mode . apheleia-mode))
+#+end_src
+
+** Delimiter pairs
+Automatic delimiter pairing in programming & configuration buffers, as in, auto-close matching pairs.
+#+begin_src emacs-lisp :tangle no
+  (use-package electric-pair
+    :straight (:type built-in)
+    :hook (prog-mode org-mode conf-mode)
+    :custom
+    (electric-pair-preserve-balance t)
+    (electric-pair-delete-adjacent-pairs t)
+    (electric-pair-open-newline-between-pairs t))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package smartparens
+    :diminish smartparens-mode
+    :hook (prog-mode . smartparens-mode)
+    :config
+    (require 'smartparens-config)
+    (sp-local-pair 'emacs-lisp-mode "'" nil :actions nil)
+    (sp-local-pair 'emacs-lisp-mode "`" nil :actions nil))
+#+end_src
+
+Visual bracket matching.
+#+begin_src emacs-lisp
+  (use-package paren
+    :straight (:type built-in)
+    :hook ((prog-mode org-mode conf-mode) . show-paren-local-mode)
+    :custom
+    (show-paren-delay 0.08)
+    (show-paren-when-point-inside-paren t)
+    (show-paren-style 'parenthesis))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package rainbow-delimiters
+    :hook (prog-mode . rainbow-delimiters-mode))
+#+end_src
+
+** Expand region
+#+begin_src emacs-lisp
+  (use-package expand-region
+    :bind ("C-c r e" . er/expand-region))
+#+end_src
+
+** Version control
+*** VC
+#+begin_src emacs-lisp
+  (use-package vc-hooks
+    :straight (:type built-in)
+    :custom
+    (vc-ignore-dir-regexp
+     (format "\\(%s\\)\\|\\(%s\\)"
+  	   vc-ignore-dir-regexp
+  	   tramp-file-name-regexp)))
+#+end_src
+
+*** Magit
+#+begin_src emacs-lisp
+  (use-package magit
+    :straight (magit
+  	     :type git
+  	     :files ("lisp/magit*.el" "lisp/git-*.el" "docs/magit.texi" "docs/AUTHORS.md" "LICENSE" ".dir-locals.el"
+  		     ("git-hooks" "git-hooks/*")
+  		     (:exclude "lisp/magit-section.el") "magit-pkg.el")
+  	     :host github
+  	     :repo "magit/magit")
+    :bind (("C-c g s" . magit-status)
+  	 ("C-c g l" . magit-log)
+  	 ("C-c g d" . magit-diff)))
+#+end_src
+
+*** Git timemachine
+Walk through git revisions of a file.
+#+begin_src emacs-lisp
+  (use-package git-timemachine
+    :bind ("C-c g t" . git-timemachine))
+#+end_src
+
+*** Git diff markers
+#+begin_src emacs-lisp :tangle no
+  (use-package git-gutter
+    :if (display-graphic-p)
+    :hook (prog-mode . git-gutter-mode)
+    :custom
+    (git-gutter:update-interval 0.02))
+
+  (use-package git-gutter-fringe
+    :if (display-graphic-p)
+    :config
+    (define-fringe-bitmap 'git-gutter-fr:added [224] nil nil '(center repeated))
+    (define-fringe-bitmap 'git-gutter-fr:modified [224] nil nil '(center repeated))
+    (define-fringe-bitmap 'git-gutter-fr:deleted [128 192 224 240] nil nil 'bottom))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package diff-hl
+    :defer t
+    :preface
+    (defun abi/diff-hl-maybe-enable ()
+      "Enable `diff-hl' modes if the current buffer is in a Git repository.  Activates `diff-hl-flydiff-mode' for live diff updates, and `diff-hl-margin-mode' when running in a graphical frame."
+      (when-let* ((file buffer-file-name)
+    		(backend (vc-backend file)))
+        (when (eq backend 'Git)
+    	(diff-hl-mode 1)
+    	(diff-hl-flydiff-mode 1)
+    	(when (display-graphic-p)
+            (diff-hl-margin-mode 1)))))
+    :hook ((prog-mode . abi/diff-hl-maybe-enable)
+    	 (dired-mode . diff-hl-dired-mode-unless-remote))
+    :custom
+    (diff-hl-disable-on-remote t)
+    (diff-hl-side 'left)
+    (diff-hl-margin-symbols-alist '((insert . "┃")
+                                    (delete . "┃")
+                                    (change . "┃")
+                                    (unknown . "?")
+                                    (ignored . "i"))))
+#+end_src
+
+*** Blamer
+#+begin_src emacs-lisp
+  (use-package blamer
+    :defer 5
+    :bind (("C-c g b" . blamer-mode)
+           ("C-c g B" . blamer-show-posframe-commit-info))
+    :custom
+    (blamer-idle-time 0.25)
+    (blamer-min-offset 20)
+    (blamer-max-commit-message-length 120)
+    (blamer-type 'overlay-popup)
+    (blamer-author-formatter "%s ")
+    (blamer-datetime-formatter "[%s]")
+    (blamer-commit-formatter "- %s")
+    :custom-face
+    (blamer-face ((t :foreground "grey50"
+                     :background unspecified
+                     :height 110
+                     :weight semi-light
+                     :italic t))))
+#+end_src
+
+** TODO Remote host connections
+
+#+begin_src emacs-lisp
+  (use-package tramp
+    :straight (:type built-in)
+    :custom
+    (remote-file-name-inhibit-locks t)
+    (tramp-use-scp-direct-remote-copying t)
+    (remote-file-name-inhibit-auto-save-visited t)
+
+    (tramp-copy-size-limit (* 1024 1024))
+    (tramp-verbose 2)
+    
+    ;; Disable version control for remote files
+    (vc-ignore-dir-regexp
+     (format "\\(%s\\)\\|\\(%s\\)"
+             vc-ignore-dir-regexp
+             tramp-file-name-regexp))
+
+    ;; Reduce file attribute checking
+    (setq remote-file-name-inhibit-cache nil)
+
+    ;; Cache connection & share it across buffers
+    (tramp-use-connection-share t)
+
+    ;; Control connection persistence
+    (tramp-use-ssh-controlmaster-options nil)
+    (tramp-ssh-controlmaster-options
+     "-o ControlMaster=auto -o ControlPath='tramp.%%C' -o ControlPersist=no")
+
+    ;; Use the remote shell's PATH as-is
+    (tramp-remote-path '(tramp-own-remote-path))
+    
+    (tramp-connection-timeout 10)
+    
+    (tramp-persistency-file-name
+     (expand-file-name "tramp" user-emacs-directory)))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package msgpack
+    :straight (msgpack
+  	     :type git
+  	     :host github
+  	     :repo "xuchunyang/msgpack.el"))
+#+end_src
+
+#+begin_src emacs-lisp :tangle no
+  (use-package tramp-rpc
+    :straight (tramp-rpc
+  	     :type git
+  	     :host github
+  	     :repo "ArthurHeymans/emacs-tramp-rpc")
+    :files ("lisp/*.el"))
+#+end_src
+
+#+begin_src emacs-lisp
+  (use-package tramp-rpc
+    :straight nil
+    :load-path "~/dev/_third/emacs-tramp-rpc/lisp"
+    :after tramp
+    :demand t
+    :custom
+    (tramp-rpc-use-direnv nil)
+    (tramp-rpc-direnv-cache-timeout 300)    
+    (tramp-rpc-async-read-timeout-ms 50)
+    (tramp-rpc-debug nil)
+    :config
+    (require 'tramp-rpc))
+#+end_src
+
+#+begin_src emacs-lisp
+  (defun abi/disable-heavy-modes-for-remote ()
+    "Set buffer-local flags to prevent heavy modes from starting in remote buffers."
+    (when (and (buffer-file-name)
+               (file-remote-p (buffer-file-name)))
+      (setq-local vc-handled-backends nil)
+      (setq-local lsp-enable-file-watchers nil)
+      (setq-local lsp-disabled-clients t)
+      (diff-hl-mode -1)
+      (auto-revert-mode -1)))
+
+  (defun abi/kill-heavy-modes-if-remote ()
+    "Disable any heavy modes that snuck in for remote buffers after major mode setup."
+    (when (and (buffer-file-name)
+               (file-remote-p (buffer-file-name)))
+      (when (bound-and-true-p lsp-mode)       (lsp-mode -1))
+      (when (bound-and-true-p flycheck-mode)  (flycheck-mode -1))
+      (when (bound-and-true-p company-mode)   (company-mode -1))
+      (when (bound-and-true-p eldoc-mode)     (eldoc-mode -1))
+      (when (bound-and-true-p apheleia-mode)  (apheleia-mode -1))))
+
+  (add-hook 'find-file-hook          #'abi/disable-heavy-modes-for-remote)
+  (add-hook 'after-change-major-mode-hook #'abi/kill-heavy-modes-if-remote)
+#+end_src
+
+** Treemacs
+NOTE(abi): you may use =C-c C-p= to add/remove a project to/from treemacs.
+#+begin_src emacs-lisp
+  (use-package treemacs
+    :defer 3
+    :bind
+    ("C-c t t" . treemacs)
+    ;;("<f7>" . treemacs)
+    ;;("C-<f7>" . treemacs-select-window)
+    :config
+    (setq treemacs-is-never-other-window t
+          treemacs-fringe-indicator-mode nil
+          treemacs-text-scale -1
+          treemacs-width 25
+          treemacs-git-commit-diff-mode t)
+    :hook
+    (treemacs-mode . treemacs-project-follow-mode)
+    (treemacs-mode . (lambda (&rest _)
+                       (setq mode-line-format nil))))
+#+end_src
+
+** Minimap
+#+begin_src emacs-lisp
+  (use-package minimap
+    :defer t
+    :bind ("C-c t m" . minimap-mode)
+    :custom
+    (minimap-highlight-line nil)
+    (minimap-window-location 'right)
+    (minimap-update-delay 0)
+    (minimap-width-fraction 0.1)
+    (minimap-minimum-width 25)
+    (minimap-major-modes '(prog-mode))
+    :config
+    (set-face-background 'minimap-active-region-background 
+                         (color-darken-name (face-background 'default) 30))
+    (set-face-attribute 'minimap-font-face nil :height 40)
+    :hook
+    (minimap-sb-mode . (lambda (&rest _)
+                         (setq header-line-format nil))))
+#+end_src
+
+** Line wrapping
+#+begin_src emacs-lisp
+  (setq-default word-wrap nil
+  	      truncate-lines t)
+#+end_src
+
+** Scope indication
+Show where we are at in the headerline.
+#+begin_src emacs-lisp :tangle no
+  (use-package breadcrumb
+    :config
+    (breadcrumb-mode 1))
+#+end_src
+
+** Developer documentation
+#+begin_src emacs-lisp
+  (use-package devdocs-browser)
+#+end_src
+** TODO JIT spell checker
+#+begin_src emacs-lisp :tangle no 
+  (use-package jinx
+    :hook (emacs-startup . global-jinx-mode)
+    :bind (("M-$" . jinx-correct)
+  	 ("C-M-$" . jinx-languages)))
+#+end_src
+
+** TODO Automatic C++ includes
+#+begin_src emacs-lisp :tangle no
+  ;; NOTE(abi): Ben Deane's version is much more featureful.
+  ;; https://github.com/elbeno/dotemacs/blob/main/.emacs.d/site-lisp/cpp-auto-include.el
+  (use-package cpp-auto-include
+    :straight nil
+    :load-path local-packages-directory
+    :bind (:map c++-ts-mode-map
+                ("C-c i" . cpp-auto-include/ensure-includes-for-file)))
+#+end_src
+
+** Gif screencasts
+#+begin_src emacs-lisp
+  (use-package gif-screencast
+    :bind ("<f9>" . gif-screencast-start-or-stop)
+    :custom
+    (gif-screencast-program "sh")
+    (gif-screencast-args
+     '("-c" "grim -g \"$(slurp)\" \"$1\""))
+    (gif-screencast-convert-program "magick")
+    (gif-screencast-convert-args
+     '("convert"
+       "-delay" "4"
+       "-loop" "0"
+       "-dither" "None"
+       "-colors" "128"
+       "-layers" "OptimizeFrame")))
+#+end_src
+
+* CUSTOM LAYER
+** Frames & windows manipulation
+Managing window layout.
+#+begin_src emacs-lisp
+  (use-package window
+    :straight (:type built-in)
+    :preface
+    (defun abi/window-vertical-split ()
+      "Split window vertically and move cursor to the new window."
+      (interactive)
+      (split-window-right)
+      (other-window 1))
+
+    (defun abi/window-horizontal-split ()
+      "Split window horizontally and move cursor to the new window."
+      (interactive)
+      (split-window-below)
+      (other-window 1))
+    :bind (("C-c w v" . abi/window-vertical-split)
+    	 ("C-c w s" . abi/window-horizontal-split)
+    	 ("C-c w d" . delete-window)
+    	 ("C-c w D" . delete-other-windows)))
+#+end_src 
+
+Move between windows with ease.
+#+begin_src emacs-lisp
+  (use-package windmove
+    :straight (:type built-in)
+    :bind (("C-c w h" . windmove-left)
+           ("C-c w l" . windmove-right)
+           ("C-c w j" . windmove-down)
+           ("C-c w k" . windmove-up)))
+#+end_src
+
+Quickly jump to a specific window.
+#+begin_src emacs-lisp
+  (use-package ace-window
+    :bind ("C-c w w" . ace-window)
+    :custom
+    (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+    (aw-scope 'frame))
+#+end_src
+
+Rearrange/transpose windows.
+#+begin_src emacs-lisp
+  (use-package transpose-frame
+    :bind (("C-c w t" . transpose-frame)
+  	 ("C-c w r" . rotate-frame-clockwise)
+  	 ("C-c w R" . rotate-frame-anticlockwise)
+  	 ("C-c w f" . flop-frame)
+  	 ("C-c w F" . flip-frame)))
+#+end_src
+
+Undo/redo window configurations.
+#+begin_src emacs-lisp
+  (use-package winner
+    :straight (:type built-in)
+    :bind (("C-c w u" . winner-undo)
+  	 ("C-c w r" . winner-redo))
+    :config
+    (winner-mode 1))
+#+end_src
+
+Make emacs split windows horizontally when finding header files.
+#+begin_src emacs-lisp
+  (defun abi/force-window-split-horizontally (orig-fun &rest args)
+    "Force `find-file-other-window' to split horizontally."
+    (let ((split-height-threshold nil)
+          (split-width-threshold 0))
+      (apply orig-fun args)))
+
+  (advice-add 'find-file-other-window :around #'force-window-split-horizontally)
+#+end_src
+
+Toggle full frame view of the active window.
+#+begin_src emacs-lisp
+  (defvar windows-state nil)
+
+  (defun abi/focus-window()
+    "Toggle full frame view of the current window."
+    (interactive)
+    (if (and (one-window-p) windows-state)
+        (window-state-put windows-state)
+      (setq windows-state (window-state-get))
+      (delete-other-windows)))
+
+  (bind-key "C-c w f" 'abi/focus-window)
+#+end_src
+
+IMPORTANT(abi): you may want to disable this if you have a tiling window manager in place.
+#+begin_src emacs-lisp :tangle no
+  (bind-key "M-RET" 'toggle-frame-fullscreen)
+#+end_src
+
+** TODO Text editing & navigation
+Comment line/region toggle.
+#+begin_src emacs-lisp
+  ;; A better `comment-dwim', with no weird single-line / region behaviours and preservation
+  ;; of the point position.
+  (defun abi/comment-dwim ()
+    "Comment or uncomment the region, if active, or the current line otherwise."
+    (interactive)
+    (if (use-region-p)
+        (comment-or-uncomment-region (region-beginning) (region-end))
+      ;; NOTE(abi): we can apply the same function on line boundaries.
+      (let ((line-beg (line-beginning-position))
+    	  (line-end (line-end-position)))
+        (if (comment-only-p line-beg line-end)
+    	  (uncomment-region line-beg line-end)
+    	(comment-region line-beg line-end)))))
+#+end_src
+
+Smart beginning of line.
+#+begin_src emacs-lisp
+  (defun abi/smart-move-beginning-of-line (ARG)
+    "Jump back and forth between indentation level and beginning of line (ARG)."
+    (interactive "^p")
+    (setq ARG (or ARG 1))
+    (when (/= ARG 1)
+      (let ((line-move-visual nil))
+        (forward-line (1-ARG))))
+    (let ((orig-point (point)))
+      (back-to-indentation)
+      (when (= orig-point (point))
+        (move-beginning-of-line 1))))
+#+end_src
+
+Smart copy line/region.
+#+begin_src emacs-lisp
+  (defun abi/smart-copy ()
+    "Copy active region, or else the current line."
+    (interactive)
+    (if (region-active-p)
+        (copy-region-as-kill (region-beginning) (region-end))
+      (copy-region-as-kill (line-beginning-position) (line-end-position))))
+#+end_src
+
+Duplicate line.
+#+begin_src emacs-lisp
+  (defun abi/duplicate-line ()
+    "Duplicate the current line right under it."
+    (interactive)
+    (let ((col (current-column)))
+      (save-excursion
+        (let ((line (buffer-substring (line-beginning-position) (line-end-position))))
+  	(end-of-line)
+  	(newline)
+  	(insert line)))
+      (forward-line 1)
+      (move-to-column col)))
+#+end_src
+
+Keybindings.
+TODO(abi): review these! They seem to be interfering with =meow=.
+#+begin_src emacs-lisp
+  (bind-key "C-v" 'yank)
+  (bind-key "C-;" 'comment-indent)
+  (bind-key "M-ç" 'abi/comment-dwim)
+  (bind-key "C-q" 'abi/smart-copy)
+  (bind-key "C-d" 'abi/duplicate-line)
+  (bind-key "C-a" 'abi/smart-move-beginning-of-line)
+#+end_src
+
+** Tangling & byte-compiling literate config
+Quickly tangle & byte-compile any opened org buffer.
+#+begin_src emacs-lisp
+  (defun abi/org-tangle-and-compile ()
+    "Tangle current Org file to its corresponding .el file and byte-compile it.
+  The .el file is created in the same directory with the same base name."
+    (interactive)
+    (when (and (eq major-mode 'org-mode)
+               (buffer-file-name))
+      (let* ((org-confirm-babel-evaluate nil)
+             (org-file (buffer-file-name))
+             (el-file (expand-file-name 
+                       (concat (file-name-base org-file) ".el")
+                       (file-name-directory org-file)))
+             (elc-file (concat el-file "c")))
+        
+        ;; Tangle the org file
+        (if (org-babel-tangle-file org-file el-file)
+            (progn
+              (message "Tangled %s → %s" 
+                       (file-name-nondirectory org-file)
+                       (file-name-nondirectory el-file))
+  	    
+      	    ;; Try to byte-compile it
+              (when (and (fboundp 'native-comp-available-p)
+                         (native-comp-available-p))
+                (message "Native compiling %s in the background"
+  		       (file-name-nondirectory el-file)))
+              (condition-case nil
+      		(progn
+                    (byte-compile-file el-file)
+  		  (when (file-exists-p elc-file)
+  		    (message "Byte-compiled %s → %s"
+  			     (file-name-nondirectory el-file)
+  			     (file-name-nondirectory elc-file))))
+                (error
+                 (message "Failed to byte-compile %s"
+      			(file-name-nondirectory el-file)))))
+      	(message "Failed to tangle %s" (file-name-nondirectory org-file))))))
+#+end_src
+
+Tangle & byte compile this literate config on save.
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (when (equal buffer-file-name
+  			 (expand-file-name "config.org" user-emacs-directory))
+                (add-hook 'after-save-hook
+  			#'abi/org-tangle-and-compile nil t))))
+#+end_src
+
+#+begin_src emacs-lisp
+  (bind-key "C-c c" (lambda ()
+                      (interactive)
+  		    (find-file (expand-file-name "config.org" user-emacs-directory))))
+#+end_src
+
+** Minibuffer
+By default we need to hit =Esc= thrice to keyboard escape the minibuffer. The escape key has one
+purpose, let's make it so a single key press is enough.
+NOTE: we may also use =Ctrl+G= to quit the minibuffer.
+#+begin_src emacs-lisp
+  (bind-key [escape] 'keyboard-escape-quit)
+#+end_src
+
+** Calculator
+#+begin_src emacs-lisp
+  (bind-key "C-%" 'quick-calc)
+#+end_src
+
+* TODO FUTURE IMPROVEMENTS
+** To set up
++ Bookmarks & registers
++ tempel / skeletons
+
++ git-link
++ dwim (git clone)
+*** multiple cursors
+Do I really need this if I get used to meow?
+  #+begin_src emacs-lisp :tangle no
+    (use-package multiple-cursors
+      :bind (("C->" . mc/mark-next-like-this)
+    	 ("C-<" . mc/mark-previous-like-this)
+    	 ("C-c C-<" . mc/mark-all-like-this)
+    	 ("C-S-c C-S-c" . mc/edit-lines)))
+  #+end_src
+  
+*** wgrep -> For editable grep/consult buffers. It looks nifty for refactoring workflows.
+#+begin_src emacs-lisp :tangle no
+  (use-package wgrep
+    :config
+    (setq wgrep-auto-save-buffer t)
+    (setq wgrep-change-readonly-file t))
+#+end_src
+
+*** In-buffer / code completions (dabbrev-expand / hippie-expand, corfu & corfu-doc, cape)
+#+begin_src emacs-lisp :tangle no
+  (use-package cape
+    :init
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+    (add-to-list 'completion-at-point-functions #'cape-file)
+    (add-to-list 'completion-at-point-functions #'cape-elisp-block))  
+#+end_src
+
+#+begin_src emacs-lisp :tangle no
+  (use-package corfu
+    :custom
+    (corfu-cycle t)
+    (corfu-auto t)
+    (corfu-auto-delay 0.0)
+    (corfu-auto-prefix 2)
+    (corfu-quit-no-match 'separator)
+    :init
+    (global-corfu-mode)
+    (corfu-history-mode))
+
+  (use-package corfu-popupinfo
+    :after corfu
+    :hook (corfu-mode . corfu-popupinfo-mode)
+    :custom
+    (corfu-popupinfo-delay '(0.5 . 0.2)))
+#+end_src
+
+#+begin_src emacs-lisp :tangle no
+  (use-package abbrev
+    :straight (:type built-in)
+    :diminish abbrev-mode
+    :custom
+    (abbrev-file-name (expand-file-name "abbrev_defs" user-emacs-directory))
+    (save-abbrevs 'silently)
+    :config
+    (setq-default abbrev-mode t))
+#+end_src
+
+** Packages worth checking out
++ combobulate
++ tree-edit
++ lispy
++ consult-dir
++ occur
++ hydra
++ deadgrep & wgrep-deadgrep
++ better-jumper
++ org-roam / org-ui
++ dirvish
++ dired-hacks
++ no-littering
