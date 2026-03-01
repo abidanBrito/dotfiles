@@ -37,15 +37,25 @@
   (user-error "This configuration requires GNU Emacs 29 or newer.  You're running %s" emacs-version))
 
 (require 'org)
+(require 'ob-tangle)
+
+(setq vc-follow-symlinks nil)
+
 (let* ((config-name "config")
        (org-file (expand-file-name (concat config-name ".org") user-emacs-directory))
-       (el-file (expand-file-name (concat config-name ".el") user-emacs-directory)))
+       (el-file (expand-file-name (concat config-name ".el")  user-emacs-directory))
+       (org-confirm-babel-evaluate nil))
   (when (or (not (file-exists-p el-file))
             (file-newer-than-file-p org-file el-file))
-    (org-babel-tangle-file org-file el-file)
-    (message "Bootstrapped: tangled %s.org → %s.el" config-name config-name))
-
-  (load el-file nil 'nomessage))
+    (condition-case err
+	(progn
+	  (org-babel-tangle-file org-file)
+	  (message "Bootstrapped: tangled %s.org → %s.el" config-name config-name))
+      (error
+       (error "Failed to tangle %s: %s" org-file (error-message-string err)))))
+  (if (file-exists-p el-file)
+      (load el-file nil 'nomessage)
+    (error "Tangle produced no config.el - Check :tangle headers in %s" org-file)))
 
 (provide 'init)
 ;;; init.el ends here
