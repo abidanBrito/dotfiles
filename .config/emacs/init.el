@@ -33,8 +33,8 @@
 
 ;;; Code:
 
-(when (< emacs-major-version 29)
-  (user-error "This configuration requires GNU Emacs 29 or newer.  You're running %s" emacs-version))
+(when (< emacs-major-version 30)
+  (user-error "This configuration requires GNU Emacs 30 or newer.  You're running %s" emacs-version))
 
 (require 'org)
 (require 'ob-tangle)

@@ -3058,6 +3058,7 @@ NOTE(abi): to check if a language grammar has been properly installed, you may u
     :custom
     (treesit-max-buffer-size (* 2048 1024 1024))
     (c-ts-mode-indent-offset 4)
+    (lua-ts-indent-offset 4)
     :config
     (abi/ts-install-language-grammars-async))
 #+end_src
@@ -3563,7 +3564,26 @@ Linter for Emacs Lisp files metadata.
   	      ("C-x C-a" . gdb-run-continue)))
 #+end_src
 
-** Automatic indentation
+** Indentation
+Default to spaces for indentation.
+#+begin_src emacs-lisp
+  (setq-default indent-tabs-mode nil)
+#+end_src
+
+While I do prefer spaces over tabs, do respect whatever style a given file or project already uses (in the spirit of collaboration).
+#+begin_src emacs-lisp
+  ;; Explicit indentation rules (.editorconfig)
+  (use-package editorconfig
+    :straight (:type built-in)
+    :config
+    (editorconfig-mode 1))
+
+  ;; Fall back to infering the existing style 
+  (use-package dtrt-indent
+    :config
+    (dtrt-indent-global-mode 1))
+#+end_src
+
 #+begin_src emacs-lisp :tangle no
   (use-package aggressive-indent
     :straight (aggressive-indent
@@ -3573,6 +3593,7 @@ Linter for Emacs Lisp files metadata.
     :defer t
     :hook (prog-mode . aggressive-indent-mode))
 #+end_src
+
 ** Formatting
 =Alpheleia= leverages external CLI code formatters so that programming buffers get auto-formatted on save. It's fast, language-agnostic and, unlike similar packages and it keeps the point fixed in place. It does so by using [[https://web.archive.org/web/20220527003730/https://tools.ietf.org/doc/tcllib/html/rcs.html#section4][RCS patches]] and [[https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm][a very cool dynamic programming algorithm for string alignment]].
 #+begin_src emacs-lisp
