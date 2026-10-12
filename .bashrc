@@ -4,17 +4,17 @@
 [[ $- != *i* ]] && return
 
 # Load environment variables
-if [ -f ~/.shell_env ]; then
-    source ~/.shell_env || echo "WARNING: failed to load ~/.shell_env" >&2
+if [ -f ~/.config/shell/profile ]; then
+    source ~/.config/shell/profile || echo "WARNING: failed to load ~/.config/shell/profile" >&2
 else
-    echo "WARNING: ~/.shell_env not found" >&2
+    echo "WARNING: ~/.config/shell/profile not found" >&2
 fi
 
 # Load aliases
-if [ -f ~/.shell_aliases ]; then
-    source ~/.shell_aliases || echo "WARNING: failed to load ~/.shell_aliases" >&2
+if [ -f ~/.config/shell/aliases ]; then
+    source ~/.config/shell/aliases || echo "WARNING: failed to load ~/.config/shell/aliases" >&2
 else
-    echo "WARNING: ~/.shell_aliases not found" >&2
+    echo "WARNING: ~/.config/shell/aliases not found" >&2
 fi
 
 # Better prompt

@@ -1,4 +1,4 @@
-# .shell_aliases
+# aliases - shared aliases & functions
 
 # Directory listing
 alias ls='eza --group-directories-first --icons'
@@ -32,6 +32,11 @@ alias g='git'
 # Misc helpers
 alias md='mkdir -p'
 alias path='echo $PATH | tr ":" "\n"'
+
+# Make a directory (with parents) and cd into it
+mkcd() {
+    mkdir -p -- "$1" && cd -- "$1"
+}
 
 # Safety nets, always prompt before overwriting or deleting data
 alias cp='cp -i'
