@@ -13,6 +13,7 @@ alias -- -='cd -'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
+alias zf='__zoxide_zi'
 
 # Search & text processing (grep variants)
 alias grep='grep --color=auto'
@@ -26,6 +27,11 @@ alias emt='emacsclient -t -a ""'
 alias vim='nvim'
 alias cat='bat'
 alias lg='lazygit'
+alias g='git'
+
+# Misc helpers
+alias md='mkdir -p'
+alias path='echo $PATH | tr ":" "\n"'
 
 # Safety nets, always prompt before overwriting or deleting data
 alias cp='cp -i'
