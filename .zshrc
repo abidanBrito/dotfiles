@@ -35,24 +35,37 @@ fi
 # Load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
-# Add in plugins
-zinit light zsh-users/zsh-syntax-highlighting
-zinit light zsh-users/zsh-autosuggestions
+# Completions plugin
+# Synchronous and before compinit (blockf defers its compdefs)
+zinit ice blockf
 zinit light zsh-users/zsh-completions
-zinit light Aloxaf/fzf-tab
 
-# Add in snippets
-zinit snippet OMZP::command-not-found
-zinit snippet OMZP::archlinux
-zinit snippet OMZP::sudo
-zinit snippet OMZP::git
-zinit snippet OMZP::conda
+# Plugins (deferred)
+# NOTE(abi): syntax-highlighting last so it wraps every widget.
+zinit wait lucid for \
+    Aloxaf/fzf-tab \
+  atload"_zsh_autosuggest_start" \
+    zsh-users/zsh-autosuggestions \
+    zsh-users/zsh-syntax-highlighting
+
+# Snippets (deferred)
+zinit wait lucid for \
+    OMZP::command-not-found \
+    OMZP::archlinux \
+    OMZP::sudo \
+    OMZP::git \
+    OMZP::conda
 
 ### Keybindings
 # Enable Emacs-like keybindings
 bindkey -e
 bindkey '^p' history-search-backward
 bindkey '^n' history-search-forward
+
+# Edit command line in $EDITOR
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^x^e' edit-command-line
 
 # Fix backspace
 bindkey "^[[3~" delete-char
@@ -82,7 +95,7 @@ setopt hist_find_no_dups
 # Load completions
 autoload -U compinit && compinit
 
-# Replay all cached completions
+# Replay cached completions
 zinit cdreplay -q
 
 # Case-insensitive completion styling
@@ -101,7 +114,20 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'eza --icons $realpath'
 ### Shell integrations
 if [[ "$TERM" != "dumb" ]] && command -v starship &> /dev/null; then
     eval "$(starship init zsh)"
+
+    # Transient prompt
+    _starship_transient_prompt() {
+        PROMPT="$(starship module character)"
+        zle .reset-prompt
+    }
+    _starship_restore_prompt() {
+        PROMPT="$(starship prompt)"
+    }
+    precmd_functions+=(_starship_restore_prompt)
+    autoload -Uz add-zle-hook-widget
+    add-zle-hook-widget zle-line-finish _starship_transient_prompt
 fi
-command -v zoxide &> /dev/null && eval "$(zoxide init --cmd cd zsh)"
+
+command -v zoxide &> /dev/null && eval "$(zoxide init zsh)"
 command -v fzf &> /dev/null && eval "$(fzf --zsh)"
 command -v uv &> /dev/null && eval "$(uv generate-shell-completion zsh)"
