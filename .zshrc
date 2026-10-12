@@ -117,7 +117,7 @@ if [[ "$TERM" != "dumb" ]] && command -v starship &> /dev/null; then
 
     # Transient prompt
     _starship_transient_prompt() {
-        PROMPT="$(starship module character)"
+        PROMPT=$'\n'"$(starship module character)"
         zle .reset-prompt
     }
     _starship_restore_prompt() {
