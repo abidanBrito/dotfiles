@@ -1,0 +1,8 @@
+# Tangled outputs
+config.el
+early-init.el
+
+# Backups, autosaves and lock files
+*~
+\#*\#
+.\#*
