@@ -1,0 +1,124 @@
+# -*- mode: conf-unix -*-
+
+[user]
+name = Abidan Brito
+email = 43681148+abidanBrito@users.noreply.github.com
+
+[github]
+user = abidanBrito
+
+[init]
+defaultBranch = main
+
+[core]
+editor = emacsclient -t -a \"\"
+autocrlf = false
+
+[protocol]
+version = 2
+
+[status]
+short = true
+branch = true
+
+[help]
+autocorrect = prompt
+
+[fetch]
+prune = true
+
+[pull]
+ff = only
+
+[push]
+default = simple
+autoSetupRemote = true
+followTags = true
+
+[commit]
+verbose = true
+
+[log]
+date = iso
+
+[branch]
+sort = -committerdate
+
+[tag]
+sort = version:refname
+
+[merge]
+conflictStyle = zdiff3
+
+[rerere]
+enabled = true
+
+[diff]
+algorithm = histogram
+indentHeuristic = true
+colorMoved = default
+context = 5
+
+[url "git@github.com:"]
+insteadOf = gh:
+
+[url "git@gist.github.com:"]
+insteadOf = gist:
+
+[filter "lfs"]
+required = true
+clean = git-lfs clean -- %f
+smudge = git-lfs smudge -- %f
+process = git-lfs filter-process
+
+[alias]
+# Staging & commits
+s = status
+a = add
+aa = add -A
+ap = add --patch
+u = restore --staged
+c = commit
+cm = commit -m
+ca = commit --amend --no-edit
+
+# Upstream & downstream
+p = push
+pf = push --force-with-lease --force-if-includes
+f = fetch
+pl = pull
+
+# Undo stuff
+undo = reset HEAD~1 --mixed
+nuke = reset --hard
+rl = reflog
+
+# Log
+l = log --oneline
+lg = log --graph --pretty=format:\"%C(yellow)%h%Creset -%C(red)%d%Creset %s %C(magenta)(%cr) [%an]\"
+lga = lg --all
+
+# Branches
+b = branch
+bl = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:magenta)(%(committerdate:relative)) [%(authorname)]'
+bla = bl --all
+br = branch -m
+bd = branch -d
+sw = switch
+swc = switch -c
+co = checkout
+
+# Stash
+st = stash push
+sta = stash push -u
+sp = stash pop
+spi = stash pop --index
+sl = stash list
+ss = stash show
+sa = stash apply
+
+# Diff
+d = diff
+ds = diff --staged
+dst = diff --stat
+
