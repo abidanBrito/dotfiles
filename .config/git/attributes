@@ -1,0 +1,22 @@
+# -*- mode: conf-unix -*-
+
+# Make lock files show as "Binary files differ" in diffs instead
+# of showing line-by-line changes. You may still see the full diff
+# by running: `git diff --text <file>`.
+
+# Python
+uv.lock -diff
+pixi.lock -diff
+poetry.lock -diff
+Pipfile.lock -diff
+
+# Rust
+Cargo.lock -diff
+
+# JavaScript / TypeScript
+package-lock.json -diff
+pnpm-lock.yaml -diff
+yarn.lock -diff
+
+# Emacs (Elpaca)
+elpaca.lock -diff
