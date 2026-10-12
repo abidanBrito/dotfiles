@@ -39,7 +39,7 @@
 (require 'org)
 (require 'ob-tangle)
 
-(setq vc-follow-symlinks nil)
+(setq vc-follow-symlinks t)
 
 (let* ((config-name "config")
        (org-file (expand-file-name (concat config-name ".org") user-emacs-directory))
@@ -49,7 +49,10 @@
             (file-newer-than-file-p org-file el-file))
     (condition-case err
 	(progn
-	  (org-babel-tangle-file org-file)
+	  ;; Tangle with symlinks UNfollowed so output lands in `user-emacs-directory'
+	  ;; (next to the symlinked config.org), not in config.org's git-repo target.
+	  (let ((vc-follow-symlinks nil) (inhibit-message t))
+	    (org-babel-tangle-file org-file))
 	  (message "Bootstrapped: tangled %s.org → %s.el" config-name config-name))
       (error
        (error "Failed to tangle %s: %s" org-file (error-message-string err)))))
