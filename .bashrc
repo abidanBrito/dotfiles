@@ -32,5 +32,9 @@ HISTCONTROL=ignoredups:erasedups:ignorespace
 shopt -s histappend
 
 ### Shell integrations
-command -v zoxide &> /dev/null && eval "$(zoxide init --cmd cd bash)"
+command -v zoxide &> /dev/null && eval "$(zoxide init bash)"
 command -v fzf &> /dev/null && eval "$(fzf --bash)"
+
+# Bash Line Editor (syntax highlighting, autosuggestions, better line editing)
+[[ $- == *i* ]] && source ~/.local/share/blesh/ble.sh --attach=none
+[[ ${BLE_VERSION-} ]] && ble-attach
