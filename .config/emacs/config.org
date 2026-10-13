@@ -122,48 +122,61 @@ It used to be the case that we had to handle no-TLS/SSL-less binaries and explic
 #+end_src
 
 ** Package manager
-I like to use =straight= as my package manager. Not only does it integrate nicely with =use-package= and =general= but it also supports retrieving packages from online Git repositories that are not on MELPA or ELPA.
+I use =elpaca= as my package manager. It installs packages asynchronously, has a simple mental model and integrates nicely with =use-package=, while still supporting arbitrary Git repositories that are not on MELPA or ELPA. The =elpaca-lock.el= file pins every package to a specific commit for reproducible installs (regenerate it with =M-x elpaca-write-lock-file=).
 #+begin_src emacs-lisp
-  ;; Run straight's bootstrap script
-  (defvar bootstrap-version)
-  (setq straight-vc-git-default-clone-depth 1)
-
-  (let ((bootstrap-file
-         (expand-file-name
-          "straight/repos/straight.el/bootstrap.el"
-          (or (bound-and-true-p straight-base-dir)
-              user-emacs-directory)))
-        (bootstrap-version 7))
-    (unless (file-exists-p bootstrap-file)
-      (with-current-buffer
-          (url-retrieve-synchronously
-           "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
-           'silent 'inhibit-cookies)
-        (goto-char (point-max))
-        (eval-print-last-sexp)))
-    (load bootstrap-file nil 'nomessage))
-
-  ;; NOTE(abi): in case we want to fork some packages.
-  (setq straight-host-usernames
-        '((github . "abidanBrito")))
-
-  (setq straight-use-package-by-default t)
-
-;; Emacs 30+ ships a recent enough Org, so we may as well use that one. By registering it here as built-in, we stop straight from pulling Org as a transitive dependency of other packages.
-  (straight-use-package '(org :type built-in))
+  ;; Elpaca bootstrap
+  (defvar elpaca-installer-version 0.12)
+  (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+  (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+  (defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
+  (defvar elpaca-lock-file (expand-file-name "elpaca-lock.el" user-emacs-directory))
+  (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                                :ref "7763ede8babd238b7a9a5835833ef4f4bdc4e53e" :depth nil :inherit ignore
+                                :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                                :build (:not elpaca-activate)))
+  (let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
+         (build (expand-file-name "elpaca/" elpaca-builds-directory))
+         (order (cdr elpaca-order))
+         (default-directory repo))
+    (add-to-list 'load-path (if (file-exists-p build) build repo))
+    (unless (file-exists-p repo)
+      (make-directory repo t)
+      (when (<= emacs-major-version 28) (require 'subr-x))
+      (condition-case-unless-debug err
+          (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                    ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                    ,@(when-let* ((depth (plist-get order :depth)))
+                                                        (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                    ,(plist-get order :repo) ,repo))))
+                    ((zerop (call-process "git" nil buffer t "checkout"
+                                          (or (plist-get order :ref) "--"))))
+                    (emacs (concat invocation-directory invocation-name))
+                    ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                          "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                    ((require 'elpaca))
+                    ((elpaca-generate-autoloads "elpaca" repo)))
+              (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+            (error "%s" (with-current-buffer buffer (buffer-string))))
+        ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+    (unless (require 'elpaca-autoloads nil t)
+      (require 'elpaca)
+      (elpaca-generate-autoloads "elpaca" repo)
+      (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+  (add-hook 'after-init-hook #'elpaca-process-queues)
+  (elpaca `(,@elpaca-order))
 #+end_src
 
 ** Configuration
-While =use-package= is not an actual package manager, it simplifies the configuration and (lazy) loading of packages massively, through macro declarations.
+While =use-package= is not an actual package manager, it simplifies the configuration and (lazy) loading of packages massively, through macro declarations. =elpaca= hooks into it through =elpaca-use-package-mode=, after which =:ensure= becomes elpaca's install keyword. We =elpaca-wait= once here so =use-package= itself is ready before any package declaration is evaluated.
 #+begin_src emacs-lisp
-  ;; Since `use-package' is no longer needed at runtime, we can
-  ;; reduce load time by requiring it early.
-  (eval-when-compile
-    (require 'use-package))
+  (elpaca elpaca-use-package
+    (elpaca-use-package-mode))
+  (elpaca-wait)
+
   (require 'bind-key)
 
-  ;; Ensure packages by default.
-  ;; IMPORTANT(abi): use ':straight (:type built-in)' or both ':ensure nil' and ':straight nil' for built-in packages.
+  ;; Ensure (install) packages by default via elpaca.
+  ;; IMPORTANT(abi): use ':ensure nil' for built-in or locally-loaded packages.
   (setq use-package-always-ensure t)
 #+end_src
 
@@ -174,6 +187,9 @@ data).
 #+begin_src emacs-lisp
   (use-package no-littering
     :demand t)
+
+  ;; Block until `no-littering' is installed and loaded
+  (elpaca-wait)
 #+end_src
 
 ** Local packages
@@ -498,7 +514,7 @@ This shouldn't be needed anymore, but we'll keep them around, just in case we ru
 ** File management
 #+begin_src emacs-lisp
     (use-package files
-      :straight (:type built-in)
+      :ensure nil
       :bind (("C-c f f" . find-file)
     	 ("C-c f F" . find-file-other-window)
     	 ("C-c f s" . save-buffer)
@@ -542,7 +558,7 @@ This shouldn't be needed anymore, but we'll keep them around, just in case we ru
 Watch for external file changes and automatically update affected buffers.
 #+begin_src emacs-lisp
   (use-package autorevert
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (auto-revert-interval 2)
     (auto-revert-verbose nil)
@@ -568,7 +584,7 @@ so let's have Emacs use short answers everywhere.
 ** Prevent hanging on large single-line files
 #+begin_src emacs-lisp
   (use-package so-long
-    :straight (:type built-in)
+    :ensure nil
     :config
     (global-so-long-mode 1))
 #+end_src
@@ -576,7 +592,7 @@ so let's have Emacs use short answers everywhere.
 ** Kill ring & mark management
 #+begin_src emacs-lisp
   (use-package simple
-    :straight (:type built-in)
+    :ensure nil
     :custom
     ;; Cull duplicates in the kill ring
     (kill-do-not-save-duplicates t)
@@ -587,7 +603,7 @@ so let's have Emacs use short answers everywhere.
 ** Write over selected region
 #+begin_src emacs-lisp
   (use-package delsel
-    :straight (:type built-in)
+    :ensure nil
     :config
     (delete-selection-mode 1))
 #+end_src
@@ -595,7 +611,7 @@ so let's have Emacs use short answers everywhere.
 ** Save cursor location
 #+begin_src emacs-lisp
   (use-package saveplace
-    :straight (:type built-in)
+    :ensure nil
     :config
     (save-place-mode 1))
 #+end_src
@@ -617,7 +633,7 @@ By default this is nil and yanks at click position instead, leading to accidenta
 Reject =SSL/TLS= server certificates that =GnuTLS= determines as invalid.
 #+begin_src emacs-lisp
   (use-package gnutls
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (gnutls-verify-error t))
 #+end_src
@@ -626,6 +642,7 @@ Reject =SSL/TLS= server certificates that =GnuTLS= determines as invalid.
 Sensible and predictable scrolling: no sudden recentering when scrolling past the window boundaries, reduced jitter on long lines and preserving the cursor position as much as possible.
 #+begin_src emacs-lisp
   (use-package emacs
+    :ensure nil
     :custom
     ;; Steps
     (scroll-step 1)
@@ -653,7 +670,7 @@ Sensible and predictable scrolling: no sudden recentering when scrolling past th
 By default the mouse wheel/trackpad scroll speed is too fast and speeds up progressively. It gets in the way of precision; let's change it.
 #+begin_src emacs-lisp
   (use-package mwheel
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (mouse-wheel-scroll-amount '(2 ((shift) . hscroll)))
     (mouse-wheel-scroll-amount-horizontal 2)
@@ -665,7 +682,7 @@ By default the mouse wheel/trackpad scroll speed is too fast and speeds up progr
 Pixel-perfect, smoooth scrolling.
 #+begin_src emacs-lisp
   (use-package pixel-scroll
-    :straight (:type built-in)
+    :ensure nil
     :preface
     (defun abi/pixel-scroll-half-page (direction)
       "Smooth half-page scroll in either direction."
@@ -727,7 +744,7 @@ Let's prevent suspending the frame accidentally.
 Let's make the current process act as a server for =emacsclient= instances, if no other Emacs is running as a daemon.
 #+begin_src emacs-lisp
   (use-package server
-    :straight (:type built-in)
+    :ensure nil
     :commands (server-running-p)
     :init (unless (server-running-p)
   	  (server-start)))
@@ -878,8 +895,7 @@ Nerd fonts are great, let's used them for icon fonts.
 
 #+begin_src emacs-lisp
   (use-package nerd-icons-completion
-    :straight (nerd-icons-completion
-  	     :type git
+    :ensure (nerd-icons-completion
   	     :host github
   	     :repo "rainstormstudio/nerd-icons-completion")
     :after nerd-icons
@@ -918,7 +934,7 @@ NOTE(abi): it is not compatible with the TTY version, but we'll keep it here as 
     :hook (dired-mode . all-the-icons-dired-mode))
 #+end_src
 
-** Frames & windows
+** TODO Frames & windows
 *** Title bar
 Show the path to current file on the title bar.
 #+begin_src emacs-lisp
@@ -940,7 +956,7 @@ Alternatively, we could remove it completely.
   (set-frame-parameter nil 'alpha-background 98)
 #+end_src
 
-*** Window dividers & padding
+*** TODO Window dividers & padding
 With =window-divider= we get finer control over window borders.
 #+begin_src emacs-lisp
   (when (boundp 'window-divider-mode)
@@ -949,27 +965,28 @@ With =window-divider= we get finer control over window borders.
           window-divider-default-bottom-width 8)
     (window-divider-mode 1))
 
-  ;; Get the current background color
+  (add-to-list 'default-frame-alist '(internal-border-width . 8))
+
   (defun abi/get-background-color ()
     "Return the current background color."
     (face-attribute 'default :background))
 
-  ;; Set window divider faces with current background color
-  (let ((bg-color (abi/get-background-color)))
-    (face-spec-set 'window-divider `((t :foreground ,bg-color)))
-    (face-spec-set 'window-divider-first-pixel `((t :foreground ,bg-color)))
-    (face-spec-set 'window-divider-last-pixel `((t :foreground ,bg-color))))
+  (defun abi/style-frame-borders (&rest _)
+    "Paint window-divider and internal-border faces with the theme background."
+    (let ((bg-color (abi/get-background-color)))
+      (face-spec-set 'window-divider `((t :foreground ,bg-color)))
+      (face-spec-set 'window-divider-first-pixel `((t :foreground ,bg-color)))
+      (face-spec-set 'window-divider-last-pixel `((t :foreground ,bg-color)))
+      (face-spec-set 'internal-border `((t :background ,bg-color)))))
 
-  ;; Set internal border with current background color
-  (add-to-list 'default-frame-alist '(internal-border-width . 8))
-  (face-spec-set 'internal-border `((t :background ,(abi/get-background-color))))
+  (add-hook 'after-load-theme-hook #'abi/style-frame-borders)
+  (abi/style-frame-borders)
 #+end_src
 
 Nowadays we have =spacious-padding=, which provides a much better solution than the above. That said, I've run into some weird quirks with my config, most likely something on my end...
 #+begin_src emacs-lisp :tangle no
   (use-package spacious-padding
-    :straight (spacious-padding
-  	     :type git
+    :ensure (spacious-padding
   	     :host github
   	     :repo "emacs-straight/spacious-padding"
   	     :files ("*" (:exclude ".git")))
@@ -1005,7 +1022,6 @@ Easily distingish buffers not associated to a file with =solaire-mode=.
 ** TODO Modeline & echo area
 #+begin_src emacs-lisp
   (use-package sleek-modeline
-    :straight nil
     :ensure nil
     :init (add-to-list 'load-path (expand-file-name "sleek-modeline/" abi/emacs-dev-dir))
     :after catppuccin-theme
@@ -1088,7 +1104,7 @@ IMPORTANT(abi): we avoid using =global-display-line-numbers-mode= because it doe
 #+begin_src emacs-lisp
   ;; PERF(abi): skip per-buffer (on-the-fly) width computations by explicitly defining it.
   (use-package display-line-numbers
-    :straight (:type built-in)
+    :ensure nil
     :hook
     ((prog-mode conf-mode) . display-line-numbers-mode)
     :config
@@ -1134,7 +1150,6 @@ Don't stretch the cursor for wide characters.
 Phantom cursor overlays for the active region ends.
 #+begin_src emacs-lisp
   (use-package region-cursors
-    :straight nil
     :ensure nil
     :init (add-to-list 'load-path (expand-file-name "region-cursors/" abi/emacs-dev-dir))
     :custom
@@ -1172,7 +1187,6 @@ Phantom cursor overlays for the active region ends.
 
 #+begin_src emacs-lisp
   (use-package prog-faces
-    :straight nil
     :ensure nil
     :init (add-to-list 'load-path (expand-file-name "prog-faces/" abi/emacs-dev-dir))
     :config
@@ -1208,7 +1222,7 @@ Underline at descent position, not baseline position.
 Make it easier to focus on the current line by highlighting it.
 #+begin_src emacs-lisp
   (use-package hl-line
-    :straight (:type built-in)
+    :ensure nil
     :config
     (bind-key* "C-c t h" #'hl-line-mode)
     (global-hl-line-mode t))
@@ -1236,6 +1250,7 @@ Escape sequences are not plain text and need to be interpreted. By highlighting 
 Case-insensitive completions, recursive minibuffer instances and increased history length.
 #+begin_src emacs-lisp
   (use-package emacs
+    :ensure nil
     :custom
     (completion-ignore-case t)
     (read-buffer-completion-ignore-case t)
@@ -1247,7 +1262,7 @@ Case-insensitive completions, recursive minibuffer instances and increased histo
 Show minibuffer recursion depth when nested prompts are active.
 #+begin_src emacs-lisp
   (use-package mb-depth
-    :straight (:type built-in)
+    :ensure nil
     :config
     (minibuffer-depth-indicate-mode 1))
 #+end_src
@@ -1354,6 +1369,7 @@ Helpful, colorful annotations for completion candidates.
 Store selection history for completion lists.
 #+begin_src emacs-lisp
   (use-package savehist
+    :ensure nil
     :config
     (savehist-mode 1))
 #+end_src
@@ -1555,10 +1571,12 @@ Store selection history for completion lists.
 #+end_src
 
 ** Org mode
-Org Mode is a major mode that supercharges GNU Emacs in a big way. Org is =a markup language like no other=. It can be used for a plethora of tasks, from note-taking, time-tracking and project management, to literate programming, scientific writing and even light web development.
+Org is =a markup language like no other= and its major mode supercharges GNU Emacs in a big way. It can be used for a plethora of tasks, from note-taking, time-tracking and project management, to literate programming, scientific writing and even light web development.
+
+Note that Org is intentionally left as a built-in package; Emacs 30+ ships a recent enough Org, and =init.el= already loads it to tangle this file before =elpaca= ever runs.
 #+begin_src emacs-lisp
   (use-package org
-    :straight nil
+    :ensure nil
     :demand t
     :preface
     (defun abi/open-agenda-file ()
@@ -1673,8 +1691,7 @@ Better looking =Org Mode=.
 
   (use-package org-modern-indent
     :after org-modern
-    :straight (org-modern-indent
-  	     :type git
+    :ensure (org-modern-indent
   	     :host github
   	     :repo "jdtsmith/org-modern-indent")
     :hook
@@ -1683,8 +1700,7 @@ Better looking =Org Mode=.
 
 #+begin_src emacs-lisp
   (use-package visual-fill-column
-    :straight (visual-fill-column
-  	     :type git
+    :ensure (visual-fill-column
   	     :host codeberg
   	     :repo "joostkremers/visual-fill-column")
     :defer t
@@ -1697,7 +1713,7 @@ Better looking =Org Mode=.
 ** Dired
 #+begin_src emacs-lisp
   (use-package dired
-    :straight (:type built-in)
+    :ensure nil
     :preface
     (defun abi/dired-mode-remote-setup ()
       "Disable expensive features for remote dired buffers."
@@ -1735,8 +1751,7 @@ Useful additions/extensions from =dired-hacks.=
 #+begin_src emacs-lisp
   (use-package dired-subtree
     :after dired
-    :straight (dired-subtree
-  	     :type git
+    :ensure (dired-subtree
   	     :host github
   	     :repo "Fuco1/dired-hacks"
   	     :files ("dired-subtree.el" "dired-subtree-pkg.el"))
@@ -1749,8 +1764,7 @@ Ranger-style clipboard support: mark files, copy or cut them to a ring, then pas
 #+begin_src emacs-lisp
   (use-package dired-ranger
     :after dired
-    :straight (dired-ranger
-  	     :type git
+    :ensure (dired-ranger
   	     :host github
   	     :repo "Fuco1/dired-hacks"
   	     :files ("dired-ranger.el" "dired-ranger-pkg.el"))
@@ -1764,7 +1778,7 @@ Ranger-style clipboard support: mark files, copy or cut them to a ring, then pas
 *** Comint
 #+begin_src emacs-lisp
   (use-package comint
-    :straight (:type built-in)
+    :ensure nil
     :defer t
     :preface
     (defun abi/comint-make-output-read-only (output)
@@ -1807,7 +1821,7 @@ Ranger-style clipboard support: mark files, copy or cut them to a ring, then pas
 Sane defaults for =shell-mode=.
 #+begin_src emacs-lisp
   (use-package shell
-    :straight (:type built-in)
+    :ensure nil
     :defer t
     :preface
     (defun abi/shell (n)
@@ -1862,6 +1876,7 @@ Make =Powershell 7= the default shell on Windows.
 =Eshell= is built-in, and it can leverage the full power of Emacs.
 #+begin_src emacs-lisp
   (use-package eshell
+    :ensure nil
     :bind ("C-c s e" . eshell)
     :preface
     (defun abi/eshell-comint-clear-buffer ()
@@ -1977,8 +1992,7 @@ Add fish-like autosuggestions based on history.
 *** Eat: Emulate A Terminal
 #+begin_src emacs-lisp
   (use-package eat
-    :straight (eat
-  	     :type git
+    :ensure (eat
   	     :host codeberg
   	     :repo "akib/emacs-eat"
   	     :files ("*.el" ("term" "term/*.el") "*.texi"
@@ -2098,7 +2112,7 @@ Display help buffers in the active window, don't create a new one.
 *** Keymap cheat sheets
 #+begin_src emacs-lisp
   (use-package which-key
-    :straight (:type built-in)
+    :ensure nil
     :after meow
     :custom
     (which-key-show-early-on-C-h t)
@@ -2171,7 +2185,7 @@ Display help buffers in the active window, don't create a new one.
 *** Documentation hints in the echo area
 #+begin_src emacs-lisp
   (use-package eldoc
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (eldoc-echo-area-use-multiline-p nil)
     (eldoc-idle-delay 0.4))
@@ -2387,8 +2401,7 @@ For my own templates I use =tempel=. It is lightweight, no separate template DSL
 Let Emacs do the heavy lifting and clean up whitespace in programming/configuration buffers before saving. Note that unlike =delete-trailing-whitespace=, =ws-butler= trims only on lines you actually touched, instead of nuking whitespace across the entire buffer. That means we don't pollute git blame and cause merge conflicts and angry teammates for no reason.
 #+begin_src emacs-lisp
   (use-package ws-butler
-    :straight (ws-butler
-  	     :type git
+    :ensure (ws-butler
   	     :branch "elpa/ws-butler"
   	     :repo "https://https.git.savannah.gnu.org/git/elpa/nongnu.git")
     :hook ((prog-mode conf-mode). ws-butler-mode)
@@ -2399,7 +2412,7 @@ Let Emacs do the heavy lifting and clean up whitespace in programming/configurat
 Sometimes it can be useful to see whitespace indicators.
 #+begin_src emacs-lisp
   (use-package whitespace
-    :straight (:type built-in)
+    :ensure nil
     :config
     (delete 'newline-mark whitespace-style)
     (delete 'lines whitespace-style)
@@ -2422,7 +2435,7 @@ Sometimes it can be useful to see whitespace indicators.
 Enable =repeat-mode= so commands tagged with a =repeat-map= become chordable, i.e, after the first invocation, you may tap the trailing key to keep repeating the last action. Any other key exits the transient map.
 #+begin_src emacs-lisp
   (use-package repeat
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (repeat-exit-timeout 3)
     (repeat-exit-key "RET")
@@ -2449,7 +2462,7 @@ With =avy= we can jump to / copy visible text.
 **** Better buffer names
 #+begin_src emacs-lisp
   (use-package uniquify
-    :straight (:type built-in)
+    :ensure nil
     :defer t
     :custom
     (uniquify-buffer-name-style 'forward)
@@ -2500,7 +2513,7 @@ Flip forward/backward through the *current workspace's* buffers.
 **** TODO Tabs
 #+begin_src emacs-lisp
   (use-package tab-bar
-    :straight (:type built-in)
+    :ensure nil
     :custom
     ;; Only show the bar once there's more than one workspace.
     (tab-bar-show t)
@@ -2637,7 +2650,7 @@ Show file details in a posframe. It also allows to quickly copy them.
 Keep a log of recently visited files so that we can quickly access them again. We save the list every 5 min.
 #+begin_src emacs-lisp
   (use-package recentf
-    :straight (:type built-in)
+    :ensure nil
     :bind ("\C-x\ \C-r" . recentf-open)
     :custom
     (recentf-max-menu-items 75)
@@ -2786,7 +2799,7 @@ Caveat: the advice is global to =compilation-filter=, so tools that rely on raw 
 
 #+begin_src emacs-lisp
   (use-package compile
-    :straight (:type built-in)
+    :ensure nil
     :preface
     (defvar abi/compile-should-auto-close nil
       "When non-nil, auto-close compilation window on success.")
@@ -2934,7 +2947,6 @@ So it seems like we need these to be set globally after all, so that =clangd= ca
 
 #+begin_src emacs-lisp :tangle no
   (use-package cmake-flow
-    :straight nil
     :ensure nil
     :init (add-to-list 'load-path (expand-file-name "cmake-flow/" abi/emacs-dev-dir))
     :config
@@ -2948,7 +2960,7 @@ https://tree-sitter.github.io/tree-sitter/
 NOTE(abi): to check if a language grammar has been properly installed, you may use =treesit-language-available-p=.
 #+begin_src emacs-lisp
   (use-package treesit
-    :straight (:type built-in)
+    :ensure nil
     :mode (("\\.rs\\'" . rust-ts-mode)
   	 ("\\.lua\\'" . lua-ts-mode)
   	 ("\\.js\\'"  . typescript-ts-mode)
@@ -3292,6 +3304,7 @@ https://emacs-lsp.github.io/lsp-mode/tutorials/reactjs-tutorial/#linting
 **** TailwindCSS
 #+begin_src emacs-lisp
   (use-package lsp-tailwindcss
+    :ensure (:host github :repo "merrickluo/lsp-tailwindcss")
     :after lsp-mode
     :init (setq lsp-tailwindcss-add-on-mode t)
     :config
@@ -3309,6 +3322,7 @@ https://emacs-lsp.github.io/lsp-mode/tutorials/reactjs-tutorial/#linting
 ** Web Development
 #+begin_src emacs-lisp
   (use-package typescript-ts-mode
+    :ensure nil
     :defer t
     :hook (typescript-ts-base-mode . (lambda ()
                                        (setq-local typescript-ts-indent-level 4
@@ -3336,7 +3350,7 @@ https://emacs-lsp.github.io/lsp-mode/tutorials/reactjs-tutorial/#linting
 
 #+begin_src emacs-lisp
   (use-package nxml-mode
-    :straight (:type built-in)
+    :ensure nil
     :mode (("\\.xml\\'"   . nxml-mode)
     	 ("\\.xsd\\'"   . nxml-mode)
     	 ("\\.xslt\\'"  . nxml-mode)
@@ -3450,7 +3464,7 @@ Linter for Emacs Lisp files metadata.
 ** TODO Auto-insert headers
 #+begin_src emacs-lisp :tangle no
   (use-package autoinsert
-    :straight (:type built-in)
+    :ensure nil
     :demand nil
     :custom
     (auto-insert-query nil)
@@ -3503,7 +3517,7 @@ Linter for Emacs Lisp files metadata.
 ** Project management
 #+begin_src emacs-lisp :tangle no
   (use-package project
-    :straight (:type built-in)
+    :ensure nil
     :bind-keymap ("C-c p" . project-prefix-map)
     :bind (:map project-prefix-map
   	      ("p" . project-switch-project)
@@ -3574,7 +3588,7 @@ While I do prefer spaces over tabs, do respect whatever style a given file or pr
 #+begin_src emacs-lisp
   ;; Explicit indentation rules (.editorconfig)
   (use-package editorconfig
-    :straight (:type built-in)
+    :ensure nil
     :config
     (editorconfig-mode 1))
 
@@ -3586,8 +3600,7 @@ While I do prefer spaces over tabs, do respect whatever style a given file or pr
 
 #+begin_src emacs-lisp :tangle no
   (use-package aggressive-indent
-    :straight (aggressive-indent
-  	     :type git
+    :ensure (aggressive-indent
   	     :host github
   	     :repo "Malabarba/aggressive-indent-mode")
     :defer t
@@ -3624,7 +3637,7 @@ While I do prefer spaces over tabs, do respect whatever style a given file or pr
 Automatic delimiter pairing in programming & configuration buffers, as in, auto-close matching pairs.
 #+begin_src emacs-lisp :tangle no
   (use-package electric-pair
-    :straight (:type built-in)
+    :ensure nil
     :hook (prog-mode org-mode conf-mode)
     :custom
     (electric-pair-preserve-balance t)
@@ -3644,7 +3657,7 @@ Automatic delimiter pairing in programming & configuration buffers, as in, auto-
 Visual bracket matching.
 #+begin_src emacs-lisp
   (use-package paren
-    :straight (:type built-in)
+    :ensure nil
     :hook ((prog-mode org-mode conf-mode) . show-paren-local-mode)
     :custom
     (show-paren-delay 0.08)
@@ -3667,8 +3680,7 @@ Dim out lisp's parenthesis galore.
 ** Semantic region expansion & contraction
 #+begin_src emacs-lisp
   (use-package expreg
-    :straight (expreg
-  	     :type git
+    :ensure (expreg
   	     :host github
   	     :repo "casouri/expreg")
     :config
@@ -3685,7 +3697,7 @@ Dim out lisp's parenthesis galore.
 *** VC
 #+begin_src emacs-lisp
   (use-package vc-hooks
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (vc-follow-symlinks t)
     (vc-ignore-dir-regexp
@@ -3697,13 +3709,7 @@ Dim out lisp's parenthesis galore.
 *** Magit
 #+begin_src emacs-lisp
   (use-package magit
-    :straight (magit
-  	     :type git
-  	     :files ("lisp/magit*.el" "lisp/git-*.el" "docs/magit.texi" "docs/AUTHORS.md" "LICENSE" ".dir-locals.el"
-  		     ("git-hooks" "git-hooks/*")
-  		     (:exclude "lisp/magit-section.el") "magit-pkg.el")
-  	     :host github
-  	     :repo "magit/magit")
+    :ensure t
     :bind (("C-c g s" . magit-status)
   	 ("C-c g l" . magit-log)
   	 ("C-c g d" . magit-diff)))
@@ -3783,7 +3789,7 @@ Walk through git revisions of a file.
 ** TODO Remote host connections
 #+begin_src emacs-lisp
   (use-package tramp
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (tramp-default-method "sshx")
     (tramp-connection-timeout 20)
@@ -3820,8 +3826,7 @@ Walk through git revisions of a file.
 
 #+begin_src emacs-lisp
   (use-package msgpack
-    :straight (msgpack
-  	     :type git
+    :ensure (msgpack
   	     :host github
   	     :repo "xuchunyang/msgpack.el"))
 #+end_src
@@ -3829,8 +3834,7 @@ Walk through git revisions of a file.
 #+begin_src emacs-lisp
   ;; NOTE: tramp-rpc requires Tramp >= 2.8.1.4, but your system has an older version
   ;; (use-package tramp-rpc
-  ;;   :straight (tramp-rpc
-  ;; 	     :type git
+  ;;   :ensure (tramp-rpc
   ;; 	     :host github
   ;; 	     :repo "ArthurHeymans/emacs-tramp-rpc"))
 #+end_src
@@ -3940,7 +3944,7 @@ Show where we are at in the headerline.
 Managing window layout.
 #+begin_src emacs-lisp
   (use-package window
-    :straight (:type built-in)
+    :ensure nil
     :preface
     (defun abi/window-vertical-split ()
       "Split window vertically and move cursor to the new window."
@@ -3962,7 +3966,7 @@ Managing window layout.
 Move between windows with ease.
 #+begin_src emacs-lisp
   (use-package windmove
-    :straight (:type built-in)
+    :ensure nil
     :bind (("C-c w h" . windmove-left)
            ("C-c w l" . windmove-right)
            ("C-c w j" . windmove-down)
@@ -3991,7 +3995,7 @@ Rearrange/transpose windows.
 Undo/redo window configurations.
 #+begin_src emacs-lisp
   (use-package winner
-    :straight (:type built-in)
+    :ensure nil
     :bind (("C-c w u" . winner-undo)
   	 ("C-c w r" . winner-redo))
     :config
@@ -4160,8 +4164,6 @@ Keybindings.
 * Future Improvements
 ** To set up
 + Bookmarks & registers
-+ tempel
-+ elpaca
 + ghostel
 + howm
 + vertico-directory
@@ -4207,7 +4209,7 @@ Check out deadgrep and wgrep-deadgrep too.
 
 #+begin_src emacs-lisp :tangle no
   (use-package abbrev
-    :straight (:type built-in)
+    :ensure nil
     :custom
     (abbrev-file-name (expand-file-name "abbrev_defs" user-emacs-directory))
     (save-abbrevs 'silently)
