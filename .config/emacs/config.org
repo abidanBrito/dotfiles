@@ -4093,22 +4093,22 @@ with the clipboard as a fallback) or =C-c C-k= to cancel.
     (abi/quick-text-input--cleanup))
 #+end_src
 
-** TODO Text editing & navigation
-Comment line/region toggle.
+** Text editing & navigation
+A better =comment-dwim= - Toggles whole lines, works on the region or the current line and preserves the point location.
 #+begin_src emacs-lisp
-  ;; A better `comment-dwim', with no weird single-line / region behaviours and preservation
-  ;; of the point position.
   (defun abi/comment-dwim ()
     "Comment or uncomment the region, if active, or the current line otherwise."
     (interactive)
-    (if (use-region-p)
-        (comment-or-uncomment-region (region-beginning) (region-end))
-      ;; NOTE(abi): we can apply the same function on line boundaries.
-      (let ((line-beg (line-beginning-position))
-    	  (line-end (line-end-position)))
-        (if (comment-only-p line-beg line-end)
-    	  (uncomment-region line-beg line-end)
-    	(comment-region line-beg line-end)))))
+    (save-excursion
+      (if (use-region-p)
+          (comment-or-uncomment-region
+           (save-excursion (goto-char (region-beginning)) (line-beginning-position))
+           (save-excursion (goto-char (region-end)) (line-end-position)))
+        (let ((beg (line-beginning-position))
+              (end (line-end-position)))
+          (if (comment-only-p beg end)
+              (uncomment-region beg end)
+            (comment-region beg end))))))
 #+end_src
 
 Smart beginning of line.
