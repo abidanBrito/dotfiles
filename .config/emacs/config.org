@@ -4136,28 +4136,13 @@ Smart copy line/region.
       (copy-region-as-kill (line-beginning-position) (line-end-position))))
 #+end_src
 
-Duplicate line.
-#+begin_src emacs-lisp
-  (defun abi/duplicate-line ()
-    "Duplicate the current line right under it."
-    (interactive)
-    (let ((col (current-column)))
-      (save-excursion
-        (let ((line (buffer-substring (line-beginning-position) (line-end-position))))
-  	(end-of-line)
-  	(newline)
-  	(insert line)))
-      (forward-line 1)
-      (move-to-column col)))
-#+end_src
-
 Keybindings.
 #+begin_src emacs-lisp
   (bind-key "C-v" 'yank)
   (bind-key "C-;" 'comment-indent)
   (bind-key "M-ç" 'abi/comment-dwim)
   (bind-key "C-q" 'abi/smart-copy)
-  (bind-key "C-d" 'abi/duplicate-line)
+  (bind-key "C-d" 'duplicate-dwim)
   (bind-key "C-a" 'abi/smart-move-beginning-of-line)
 #+end_src
 
