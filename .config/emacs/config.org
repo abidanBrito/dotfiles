@@ -4129,11 +4129,11 @@ Smart beginning of line.
 Smart copy line/region.
 #+begin_src emacs-lisp
   (defun abi/smart-copy ()
-    "Copy active region, or else the current line."
+    "Copy the active region, or else the current line (including its newline)."
     (interactive)
-    (if (region-active-p)
-        (copy-region-as-kill (region-beginning) (region-end))
-      (copy-region-as-kill (line-beginning-position) (line-end-position))))
+    (if (use-region-p)
+        (kill-ring-save (region-beginning) (region-end))
+      (kill-ring-save (line-beginning-position) (line-beginning-position 2))))
 #+end_src
 
 Keybindings.
