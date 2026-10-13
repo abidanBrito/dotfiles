@@ -18,5 +18,5 @@ package-lock.json -diff
 pnpm-lock.yaml -diff
 yarn.lock -diff
 
-# Emacs (Elpaca)
-elpaca.lock -diff
+# Emacs (elpaca)
+elpaca-lock.el -diff
