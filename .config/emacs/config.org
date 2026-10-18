@@ -4232,11 +4232,10 @@ Keybindings.
 * Future Improvements
 ** To set up
 + Bookmarks & registers
-+ ghostel
-+ howm
++ consult-dir
 + vertico-directory
 + copy-as-format
-+ dwim (git clone)
++ howm
 *** Editable grep/consult buffers. It looks nifty for refactoring workflows.
 #+begin_src emacs-lisp :tangle no
   (use-package wgrep
@@ -4286,12 +4285,12 @@ Check out deadgrep and wgrep-deadgrep too.
 #+end_src
 
 ** Packages worth checking out
-+ consult-dir
 + combobulate
 + tree-edit
 + lispy
 + occur
 + hydra
++ dwim
 
 * Footer
 #+begin_src emacs-lisp
