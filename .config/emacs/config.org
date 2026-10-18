@@ -1421,10 +1421,7 @@ Store selection history for completion lists.
     :config
     (dolist (mode '(comint-mode
                 	  eshell-mode
-                	  shell-mode
-                	  term-mode
-                	  vterm-mode
-                	  eat-mode))
+                	  shell-mode))
       (add-to-list 'meow-mode-state-list (cons mode 'insert)))
 
     (add-to-list 'meow-mode-state-list '(shell-command-mode . normal))
@@ -1782,12 +1779,18 @@ Ranger-style clipboard support: mark files, copy or cut them to a ring, then pas
   	      ("p" . dired-ranger-paste)))
 #+end_src
 
-** TODO Shells
-*** Comint
+** Shells & Terminal Emulators
+*** Shells
+**** Comint
+=Comint= (command interpreter) is the shared foundation behind all of Emacs's interactive subprocess buffers (=shell-mode=, REPLs, etc.). Settings here are inherited by every mode that derives from it.
 #+begin_src emacs-lisp
   (use-package comint
     :ensure nil
     :defer t
+    :bind
+    (:map comint-mode-map
+  	("C-l" . abi/comint-clear-scrollback-buffer)
+  	("M-n" . abi/focus-window))
     :preface
     (defun abi/comint-make-output-read-only (output)
       "Make comint output read-only."
@@ -1804,29 +1807,23 @@ Ranger-style clipboard support: mark files, copy or cut them to a ring, then pas
       (interactive)
       (let ((comint-buffer-maximum-size 0))
         (comint-truncate-buffer)))
-
     :custom
     (comint-scroll-show-maximum-output nil)
     (comint-highlight-input nil)
     (comint-input-ignoredups t)
     (comint-process-echoes t)
     (comint-prompt-read-only t)
-
     :hook
     (comint-mode .
                  (lambda ()
   		 (add-hook 'comint-preoutput-filter-functions
                              #'abi/comint-make-output-read-only
                              nil t)))
-    (comint-input-filter-functions . abi/comint-clear-command)
-
-    :bind
-    (:map comint-mode-map
-  	("C-l" . abi/comint-clear-scrollback-buffer)))
+    (comint-input-filter-functions . abi/comint-clear-command))
 #+end_src
 
-*** Shell-mode
-Sane defaults for =shell-mode=.
+**** Shell
+=shell-mode= runs your system shell in a =comint= buffer, giving a real interactive shell inside Emacs.
 #+begin_src emacs-lisp
   (use-package shell
     :ensure nil
@@ -1848,39 +1845,36 @@ Sane defaults for =shell-mode=.
              (when-let* ((buf (process-buffer process)))
                (kill-buffer buf)))))))
 
+    (defvar abi/shell-disable-font-lock nil
+      "When non-nil, disable font-locking in `shell-mode' buffers.
+  Font-locking colours the prompt and output but supposedly costs some
+  performance; flip this to t to trade the colours for speed.")
+
+    (defun abi/shell-maybe-disable-font-lock ()
+      "Disable font-locking in the current shell buffer when requested.
+  Honours `abi/shell-disable-font-lock' and pins font-lock off so it is
+  not re-enabled behind our back."
+      (when abi/shell-disable-font-lock
+        (font-lock-mode -1)
+        (setq-local font-lock-function #'ignore)))
     :hook
     (shell-mode . abi/shell-cleanup-on-exit)
-
+    (shell-mode . abi/shell-maybe-disable-font-lock)
     :bind
-    ("C-c s s" . abi/shell))
+    ("C-c s s" . abi/shell)
+    :config
+    ;; Default to PowerShell 7 on Windows, falling back to the
+    ;; bundled Windows PowerShell when it isn't available
+    (when (eq system-type 'windows-nt)
+      (let ((pwsh "C:\\Program Files\\PowerShell\\7\\pwsh.exe"))
+        (if (file-exists-p pwsh)
+            (setq explicit-shell-file-name pwsh
+                  explicit-pwsh.exe-args '("-NoLogo"))
+          (setq explicit-shell-file-name "powershell.exe"
+                explicit-powershell.exe-args '("-NoLogo"))))))
 #+end_src
 
-TODO(abi): integrate into the use-package snippet above.
-I do like my colored prompt and output, but supposedly font-locking does affect performance.
-#+begin_src emacs-lisp :tangle no
-  ;; PERF(abi): disable font-locking in shell buffers.
-  (add-hook 'shell-mode-hook
-            (lambda (&rest _)
-              (font-lock-mode -1)
-              ;; Prevent it from getting re-enabled
-              (make-local-variable 'font-lock-function)
-              (setq font-lock-function (lambda (&rest _)
-                                         nil))))
-#+end_src
-
-TODO(abi): integrate into the use-package snippet above.
-Make =Powershell 7= the default shell on Windows.
-#+begin_src emacs-lisp
-  (when (eq system-type 'windows-nt)
-    (let ((pwsh "C:\\Program Files\\PowerShell\\7\\pwsh.exe"))
-      (if (file-exists-p pwsh)
-          (setq explicit-shell-file-name pwsh
-                explicit-pwsh.exe-args '("-NoLogo"))
-        (setq explicit-shell-file-name "powershell.exe"
-              explicit-powershell.exe-args '("-NoLogo")))))
-#+end_src
-
-*** TODO Eshell
+**** Eshell
 =Eshell= is built-in, and it can leverage the full power of Emacs.
 #+begin_src emacs-lisp
   (use-package eshell
@@ -1897,8 +1891,7 @@ Make =Powershell 7= the default shell on Windows.
           (when (and input (not (string-empty-p input)))
             (insert input)))))
 
-    ;; Prompt customization functions
-    (defmacro with-face (STR &rest PROPS)
+    (defmacro esh-with-face (STR &rest PROPS)
       "Return STR propertized with PROPS."
       `(propertize ,STR 'face (list ,@PROPS)))
 
@@ -1911,7 +1904,7 @@ Make =Powershell 7= the default shell on Windows.
       `(setq ,NAME
              (lambda ()
                (when ,FORM
-                 (concat (with-face
+                 (concat (esh-with-face
                           ,(if ICON
                                `(concat ,ICON " " ,FORM)
                              FORM)
@@ -1930,14 +1923,11 @@ Make =Powershell 7= the default shell on Windows.
               (if (and (boundp 'eshell-funcs) eshell-funcs)
   		(seq-reduce #'esh-acc eshell-funcs "")
                 "")))
-
     :init
-    ;; Prompt configuration variables
     (setq esh-sep "  ")
     (setq esh-section-delim "|")
     (setq esh-header "\n ")
     (setq eshell-funcs nil)
-
     :custom
     (eshell-banner-message "")
     (eshell-prompt-regexp "^[^]* ")
@@ -1946,58 +1936,81 @@ Make =Powershell 7= the default shell on Windows.
     (eshell-hist-ignoredups 'erase)
     (eshell-scroll-to-bottom-on-input 'this)
     (eshell-scroll-to-bottom-on-output 'this)
-
     :config
-    ;; Define prompt sections
-    (with-eval-after-load 'nerd-icons
-
-      (esh-section esh-login-user
-         		 nil
-           	 (user-login-name)
-           	 " | "
-           	 '(:foreground "#b48ead"))
-
-      (esh-section esh-working-dir
-           	 ;; (nerd-icons-faicon "nf-fa-folder_open")
-         		 nil
-           	 (abbreviate-file-name (eshell/pwd))
-           	 " | "
-           	 '(:foreground "#8fbcbb"))
-
-      (esh-section esh-git
-           	 ;; (nerd-icons-devicon "nf-dev-git")
-         		 ""
-           	 (when-let* ((git-dir (locate-dominating-file default-directory ".git"))
-                               (head-file (expand-file-name ".git/HEAD" git-dir)))
-                     (when (file-exists-p head-file)
-                       (with-temp-buffer
-  		       (insert-file-contents head-file)
-  		       (goto-char (point-min))
-  		       (when (looking-at "ref: refs/heads/\\(.+\\)")
-           		 (match-string 1)))))
-     		 " "
-           	 '(:foreground "#ebcb8b"))
-
-      (esh-section esh-arrow
-  		 nil
-  		 " "
-  		 "")
-
-      (setq eshell-funcs (list esh-login-user esh-working-dir esh-git esh-arrow)))
-
+    (esh-section esh-login-user
+         	       nil
+                 (user-login-name)
+                 " | "
+                 '(:foreground "#b48ead"))
+    (esh-section esh-working-dir
+         	       nil
+                 (abbreviate-file-name (eshell/pwd))
+                 " | "
+                 '(:foreground "#8fbcbb"))
+    (esh-section esh-git
+         	       ""
+                 (when-let* ((git-dir (locate-dominating-file default-directory ".git"))
+                             (head-file (expand-file-name ".git/HEAD" git-dir)))
+                   (when (file-exists-p head-file)
+                     (with-temp-buffer
+  		     (insert-file-contents head-file)
+  		     (goto-char (point-min))
+  		     (when (looking-at "ref: refs/heads/\\(.+\\)")
+           	       (match-string 1)))))
+     	       " "
+                 '(:foreground "#ebcb8b"))
+    (esh-section esh-arrow
+  	       nil
+  	       " "
+  	       "")
+    (setq eshell-funcs (list esh-login-user esh-working-dir esh-git esh-arrow))
+    ;; NOTE(abi): `M-n' lives in `eshell-hist-mode-map', a minor-mode map
+    ;;            that outranks the buffer-local map, so we rebind this there.
+    (with-eval-after-load 'em-hist
+      (keymap-set eshell-hist-mode-map "M-n" #'abi/focus-window))
     :hook
     (eshell-mode . (lambda (&rest _)
                      (local-set-key (kbd "C-l") 'abi/eshell-comint-clear-buffer))))
 #+end_src
 
-TODO(abi): check the backend needed for this!
-Add fish-like autosuggestions based on history.
-#+begin_src emacs-lisp :tangle no
+Fish-like autosuggestions based on history.
+Accept a suggestion with =<right>= / =C-f= (whole) or =M-<right> =/ =M-f= (one word).
+#+begin_src emacs-lisp
   (use-package esh-autosuggest
     :hook (eshell-mode . esh-autosuggest-mode))
 #+end_src
 
-*** Eat: Emulate A Terminal
+*** Terminal Emulators
+**** Ghostel
+=Ghostel= embeds =libghostty= (the VT engine behind the Ghostty terminal) through a native module, which makes it noticeably faster than =eat= or =vterm=. On the first launch it offers to download a prebuilt native module.
+#+begin_src emacs-lisp
+  (use-package ghostel
+    :bind (("C-c s t" . ghostel)
+           ("C-c s p" . ghostel-project)
+           ("C-c s o" . ghostel-other)
+           :map ghostel-readonly-mode-map
+           ("h" . backward-char)
+           ("j" . next-line)
+           ("k" . previous-line)
+           ("l" . forward-char)
+           ("e" . forward-word)
+           ("b" . backward-word)
+           ("g" . beginning-of-buffer)
+           ("G" . ghostel-readonly-end-of-buffer)
+           ("w" . mark-word)
+           ("y" . ghostel-readonly-copy)
+           ("/" . consult-line)
+           :map ghostel-semi-char-mode-map
+           ("C-S-v" . ghostel-paste)
+           ("M-n" . abi/focus-window))
+    :config
+    (setopt ghostel-keymap-exceptions
+            (seq-uniq (append ghostel-keymap-exceptions '("M-u" "M-d"))
+                      #'string=)))
+#+end_src
+
+**** Eat
+=Eat= (Emulate A Terminal) is a terminal emulator written entirely in Emacs Lisp, so, unlike =vterm= or =ghostel=, it needs no native module or external dependency. This means it can run anywhere Emacs does.
 #+begin_src emacs-lisp
   (use-package eat
     :ensure (eat
@@ -2008,7 +2021,30 @@ Add fish-like autosuggestions based on history.
   		     ("terminfo/65" "terminfo/65/*")
   		     ("integration" "integration/*")
   		     (:exclude ".dir-locals.el" "*-tests.el")))
-    :bind ("C-c s t" . eat))
+    :bind (("C-c s T" . eat)
+           ("C-c s P" . eat-project)
+           :map eat-semi-char-mode-map
+           ("M-n" . abi/focus-window))
+    :custom
+    (eat-kill-buffer-on-exit t)
+    :config
+    (setopt eat-semi-char-non-bound-keys
+            (seq-uniq (append eat-semi-char-non-bound-keys
+                              '([?\e ?u] [?\e ?d])))))
+#+end_src
+
+*** Keep =meow= out of terminal-emulator buffers
+Real terminal emulators need raw keys, which TUIs depend on. A modal layer inevitably fights over =ESC= and the cursor, so rather than syncing states let's just turn =meow= off in these buffers and let the terminal own input.
+#+begin_src emacs-lisp
+  (defun abi/disable-meow-in-terminals ()
+    "Turn `meow' off in terminal-emulator buffers, which need raw keys (ESC)."
+    (when (derived-mode-p 'ghostel-mode 'eat-mode 'term-mode 'vterm-mode)
+      (meow-mode -1)))
+
+  ;; NOTE(abi): `meow-global-mode' enables `meow' from `after-change-major-mode-hook', so we
+  ;;            disable it from that same hook but at a later depth so it takes precedence.
+  (with-eval-after-load 'meow
+    (add-hook 'after-change-major-mode-hook #'abi/disable-meow-in-terminals 95))
 #+end_src
 
 *** Disable =hl-line-mode= in shell and terminal buffers
@@ -2025,6 +2061,7 @@ Add fish-like autosuggestions based on history.
                   term-mode-hook
                   vterm-mode-hook
                   eat-mode-hook
+                  ghostel-mode-hook
                   comint-mode-hook))
     (add-hook hook #'abi/disable-hl-line-in-shells))
 #+end_src
@@ -2513,6 +2550,7 @@ Flip forward/backward through the *current workspace's* buffers.
        "^\\*term.*\\*$" term-mode
        "^\\*vterm.*\\*$" vterm-mode
        "^\\*eat.*\\*$" eat-mode
+       "^\\*ghostel.*\\*$" ghostel-mode
        "^\\*ielm.*\\*$" ielm-mode))
     (popper-window-height 0.3)
     (popper-mode-line nil))
