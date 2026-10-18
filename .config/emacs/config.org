@@ -126,6 +126,11 @@ I use =elpaca= as my package manager. It installs packages asynchronously, has a
 #+begin_src emacs-lisp
   ;; Elpaca bootstrap
   (defvar elpaca-installer-version 0.12)
+  ;; Pre-bind to silence elpaca's stale-core-date warning on dev builds
+  (defvar elpaca-core-date
+    (list (if emacs-build-time
+              (string-to-number (format-time-string "%Y%m%d" emacs-build-time))
+            -1)))
   (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
   (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
   (defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
