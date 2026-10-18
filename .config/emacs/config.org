@@ -2570,20 +2570,17 @@ Flip forward/backward through the *current workspace's* buffers.
     (popper-mode-line nil))
 #+end_src
 
-**** TODO Tabs
+**** Tabs
 #+begin_src emacs-lisp
+  ;; TODO(abi): turn this into a small package.
   (use-package tab-bar
     :ensure nil
     :custom
-    ;; Only show the bar once there's more than one workspace.
     (tab-bar-show t)
-    ;; New workspaces start on a clean scratch buffer.
     (tab-bar-new-tab-choice "*scratch*")
-    ;; Keep the bar minimal, with numeric hints.
     (tab-bar-close-button-show nil)
     (tab-bar-new-button-show nil)
     (tab-bar-tab-hints t)
-    ;; Size tabs to their content instead of stretching across the frame.
     (tab-bar-auto-width nil)
     (tab-bar-separator " ")
     :bind (("C-<tab>"   . tab-next)
@@ -2600,9 +2597,7 @@ Flip forward/backward through the *current workspace's* buffers.
   theme) to compare the looks.")
 
     (defvar abi/tab-bar-vpad 8
-      "Vertical padding (px) above and below each tab.
-  Rendered in the frame background so it reads as a margin between the tabs and
-  the frame's top edge (and the buffer below), making the tabs \"float\".")
+      "Vertical padding (px) above and below each tab.")
 
     (defun abi/style-tab-bar (&rest _)
       "Apply centaur-inspired faces to the built-in tab-bar.
@@ -2611,35 +2606,34 @@ Flip forward/backward through the *current workspace's* buffers.
   `abi/tab-bar-accent-style') is an under/overline here, or a left stripe
   drawn by `abi/tab-bar-format-left-bar'.  All colours derive from the theme."
       (require 'color)
-      (let* ((bg          (face-attribute 'default :background))
-             (fg          (face-attribute 'default :foreground))
-             ;; Prefer a real palette tone when Catppuccin is active -- deriving
-             ;; it by darkening `bg' only scales HSL lightness, so it keeps the
-             ;; flavor's blue hue/saturation and lands on an off-palette blue.
-             ;; Fall back to a *desaturated* darken for non-Catppuccin themes.
-             (inactive-bg (if (and (bound-and-true-p catppuccin-flavor)
-                                   (fboundp 'catppuccin-color))
-                              (catppuccin-color 'mantle)
-                            (color-darken-name (color-desaturate-name bg 50) 12)))
-             (dim-fg      (let ((s (face-attribute 'shadow :foreground nil t)))
-                            (if (stringp s) s (color-darken-name fg 25))))
-             (accent      abi/tab-bar-accent))
-        ;; The bar's empty area matches the frame background.
-        (set-face-attribute 'tab-bar nil
-                            :height 0.85 :background bg :foreground fg :box nil)
-        ;; Selected tab: connected to the buffer/bar, accented per style.
-        (set-face-attribute 'tab-bar-tab nil
-                            :background bg :foreground fg :weight 'bold
-                            :overline  (and (eq abi/tab-bar-accent-style 'overline) accent)
-                            :underline (and (eq abi/tab-bar-accent-style 'underline) accent)
-                            :box `(:line-width (1 . ,abi/tab-bar-vpad) :color ,bg))
-        ;; Inactive tabs: darker and dimmed.  The box is frame-coloured (not the
-        ;; tab's own bg) so its vertical padding shows as a margin -- the dark
-        ;; tab body floats instead of touching the frame's top edge.
-        (set-face-attribute 'tab-bar-tab-inactive nil
-                            :background inactive-bg :foreground dim-fg :weight 'normal
-                            :overline nil :underline nil
-                            :box `(:line-width (1 . ,abi/tab-bar-vpad) :color ,bg))))
+      ;; NOTE(abi): skip until the theme is loaded (elpaca loads it async), else
+      ;; `default' colours are `unspecified' and the color-* calls error.
+      (when (and (stringp (face-attribute 'default :background))
+                 (stringp (face-attribute 'default :foreground)))
+        (let* ((bg          (face-attribute 'default :background))
+               (fg          (face-attribute 'default :foreground))
+               ;; TODO: a concise one-liner comment about this block...
+               (inactive-bg (if (and (bound-and-true-p catppuccin-flavor)
+                                     (fboundp 'catppuccin-color))
+                                (catppuccin-color 'mantle)
+                              (color-darken-name (color-desaturate-name bg 50) 12)))
+               (dim-fg      (let ((s (face-attribute 'shadow :foreground nil t)))
+                              (if (stringp s) s (color-darken-name fg 25))))
+               (accent      abi/tab-bar-accent))
+          ;; Make the bar's empty area match the frame background
+          (set-face-attribute 'tab-bar nil
+                              :height 0.85 :background bg :foreground fg :box nil)
+          ;; Selected tab
+          (set-face-attribute 'tab-bar-tab nil
+                              :background bg :foreground fg :weight 'bold
+                              :overline  (and (eq abi/tab-bar-accent-style 'overline) accent)
+                              :underline (and (eq abi/tab-bar-accent-style 'underline) accent)
+                              :box `(:line-width (1 . ,abi/tab-bar-vpad) :color ,bg))
+          ;; Darken and dim inactive bars
+          (set-face-attribute 'tab-bar-tab-inactive nil
+                              :background inactive-bg :foreground dim-fg :weight 'normal
+                              :overline nil :underline nil
+                              :box `(:line-width (1 . ,abi/tab-bar-vpad) :color ,bg)))))
 
     (defun abi/tab-bar-format-left-bar (name tab _i)
       "Prepend padding to NAME, plus a half-width left accent stripe.
@@ -2676,7 +2670,7 @@ Flip forward/backward through the *current workspace's* buffers.
       (abi/style-tab-bar)
       (force-mode-line-update t)
       (message "tab-bar accent style: %s" abi/tab-bar-accent-style)))
-      #+end_src
+#+end_src
 
 **** Basic bindings
 #+begin_src emacs-lisp
