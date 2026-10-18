@@ -2516,6 +2516,26 @@ With =avy= we can jump to / copy visible text.
            ("C-c a r t" . avy-transpose-lines-in-region)))
 #+end_src
 
+*** Bookmarks
+Persistent, named jumps to files and positions that survive restarts.
+#+begin_src emacs-lisp
+  (use-package bookmark
+    :ensure nil
+    :demand t
+    :custom
+    (bookmark-save-flag 1)
+    :config
+    (defvar-keymap abi/bookmark-map
+      :doc "Bookmark commands."
+      "b" #'consult-bookmark
+      "s" #'bookmark-set
+      "l" #'bookmark-bmenu-list
+      "d" #'bookmark-delete)
+    (keymap-set ctl-x-r-map "b" abi/bookmark-map)
+    (with-eval-after-load 'which-key
+      (which-key-add-key-based-replacements "C-x r b" "bookmarks")))
+#+end_src
+
 ** Buffers & files
 *** Buffer management
 **** Better buffer names
@@ -4231,7 +4251,7 @@ Keybindings.
 
 * Future Improvements
 ** To set up
-+ Bookmarks & registers
++ registers
 + consult-dir
 + vertico-directory
 + copy-as-format
