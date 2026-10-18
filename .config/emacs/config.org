@@ -2197,8 +2197,9 @@ Display help buffers in the active window, don't create a new one.
       "k" "keybindings"
       "k m" "major-mode"
       "k t" "top-level"
-      "g" "git"
-      "g L" "link"
+      "v" "git"
+      "v v" "magit"
+      "v l" "link"
       "l" "lsp"
       "l p" "peek"
       "l h" "hierarchy"
@@ -2206,7 +2207,7 @@ Display help buffers in the active window, don't create a new one.
       "e" "errors"
       "s" "shells"
       "S" "sessions"
-      "m" "build/cmake"
+      "B" "build/cmake"
       "o" "org"
       "n" "notes/news"
       "a" "avy"
@@ -2992,8 +2993,8 @@ So it seems like we need these to be set globally after all, so that =clangd= ca
         (message "Current preset: %s" abi/cmake-current-preset)
       (message "No CMake preset selected")))
 
-  (bind-key "C-c m s" 'abi/cmake-switch-preset)
-  (bind-key "C-c m S" 'abi/cmake-show-preset)
+  (bind-key "C-c B s" 'abi/cmake-switch-preset)
+  (bind-key "C-c B S" 'abi/cmake-show-preset)
 #+end_src
 
 #+begin_src emacs-lisp :tangle no
@@ -3802,23 +3803,23 @@ Dim out lisp's parenthesis galore.
 Walk through git revisions of a file.
 #+begin_src emacs-lisp
   (use-package git-timemachine
-    :bind ("C-c g t" . git-timemachine))
+    :bind ("C-c v t" . git-timemachine))
 #+end_src
 
 *** Git link
 #+begin_src emacs-lisp
   (use-package git-link
-    :bind (("C-c g L l" . git-link)
-  	 ("C-c g L c" . git-link-commit)
-  	 ("C-c g L h" . git-link-homepage)))
+    :bind (("C-c v l l" . git-link)
+  	 ("C-c v l c" . git-link-commit)
+  	 ("C-c v l h" . git-link-homepage)))
 #+end_src
 
 *** Blamer
 #+begin_src emacs-lisp
   (use-package blamer
     :defer 5
-    :bind (("C-c g b" . blamer-mode)
-           ("C-c g B" . blamer-show-posframe-commit-info))
+    :bind (("C-c v b" . blamer-mode)
+           ("C-c v B" . blamer-show-posframe-commit-info))
     :custom
     (blamer-idle-time 0.25)
     (blamer-min-offset 20)
