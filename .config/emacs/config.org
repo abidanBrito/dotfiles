@@ -1426,6 +1426,8 @@ Store selection history for completion lists.
 
     (add-to-list 'meow-mode-state-list '(shell-command-mode . normal))
 
+    (add-hook 'git-commit-setup-hook (lambda () (meow--switch-state 'insert)))
+
     (define-prefix-command 'abi/meow-z-map)
     (define-key abi/meow-z-map "z" 'recenter-top-bottom)
     (define-key abi/meow-z-map "t" 'recenter)
@@ -1438,6 +1440,7 @@ Store selection history for completion lists.
 
     (define-prefix-command 'abi/meow-go-map)
     (define-key abi/meow-go-map "g" 'beginning-of-buffer)
+    (define-key abi/meow-go-map "G" 'end-of-buffer)
     (define-key abi/meow-go-map "d" 'xref-find-definitions)
     (define-key abi/meow-go-map "D" 'lsp-find-declaration)
     (define-key abi/meow-go-map "r" 'xref-find-references)
@@ -1470,7 +1473,7 @@ Store selection history for completion lists.
       (meow-motion-define-key
        '("j" . meow-next)
        '("k" . meow-prev)
-       '("<escape>" . ignore))
+       '("<escape>" . keyboard-quit))
 
       (meow-normal-define-key
        '("0" . meow-expand-0)
