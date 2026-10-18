@@ -836,7 +836,10 @@ TODO(abi): maybe expand on this and turn it into a little package.
            (load-theme desired :no-confirm))))))
 
   ;; Check every 15 minutes
-  (run-with-timer 0 900 'abi/auto-synchronize-theme)
+  ;; NOTE(abi): deferred to `elpaca-after-init' so the theme is loaded
+  ;;            (async via elpaca) before the first sync.
+  (add-hook 'elpaca-after-init-hook
+            (lambda () (run-with-timer 0 900 'abi/auto-synchronize-theme)))
 #+end_src
 
 I'm also working on my own soft pastel dark theme, =abi-theme=.  It lives as a local package next to the others.  We put it on the theme load path so it can be enabled on demand with =M-x load-theme RET abi=.
@@ -999,7 +1002,7 @@ Nowadays we have =spacious-padding=, which provides a much better solution than 
         :right-divider-width 10
         :scroll-bar-width 8))
     :hook
-    (after-init . spacious-padding-mode))
+    (elpaca-after-init . spacious-padding-mode))
 #+end_src
 
 *** Buffer background distinction
@@ -1015,7 +1018,7 @@ Easily distingish buffers not associated to a file with =solaire-mode=.
   (push '(treemacs-window-background-face . solaire-default-face) solaire-mode-remap-alist)
   (push '(treemacs-hl-line-face . solaire-hl-line-face) solaire-mode-remap-alist)
   :hook
-  (after-init . solaire-global-mode)
+  (elpaca-after-init . solaire-global-mode)
   (dashboard-mode . turn-off-solaire-mode))
 #+end_src
 
@@ -2488,8 +2491,8 @@ Flip forward/backward through the *current workspace's* buffers.
 **** Buffer popups
 #+begin_src emacs-lisp
   (use-package popper
-    :hook ((after-init . popper-mode)
-  	 (after-init . popper-echo-mode))
+    :hook ((elpaca-after-init . popper-mode)
+  	 (elpaca-after-init . popper-echo-mode))
     :bind (("C-ñ" . popper-cycle))
     :custom
     (popper-reference-buffers
@@ -3929,7 +3932,7 @@ Show where we are at in the headerline.
 ** JIT spell checker
 #+begin_src emacs-lisp
   (use-package jinx
-    :hook ((emacs-startup . global-jinx-mode)
+    :hook ((elpaca-after-init . global-jinx-mode)
            (prog-mode . (lambda () (jinx-mode -1))))
     :bind (("M-$" . jinx-correct)
   	 ("C-M-$" . jinx-languages))
