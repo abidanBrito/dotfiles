@@ -3423,8 +3423,7 @@ https://emacs-lsp.github.io/lsp-mode/tutorials/reactjs-tutorial/#linting
     :bind (:map nxml-mode-map
                 ("C-c l F" . abi/xml-format-buffer))
     :hook ((nxml-mode . display-line-numbers-mode)
-    	 (nxml-mode . hs-minor-mode)
-	 (prog-mode . hs-minor-mode))
+    	 (nxml-mode . hs-minor-mode))
     :custom
     (nxml-auto-insert-xml-declaration-flag t)
     (nxml-slash-auto-complete-flag t)
@@ -3729,6 +3728,14 @@ Dim out lisp's parenthesis galore.
   (use-package parenthesis-face
     :config
     (parenthesis-face-mode 1))
+#+end_src
+
+** Code folding
+Hideshow block folding in all programming buffers.
+#+begin_src emacs-lisp
+  (use-package hideshow
+    :ensure nil
+    :hook (prog-mode . hs-minor-mode))
 #+end_src
 
 ** Semantic region expansion & contraction
