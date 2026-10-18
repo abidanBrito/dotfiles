@@ -2394,8 +2394,16 @@ Preserve the contents of scratch buffers across sessions as well.
     :custom
     (golden-ratio-exclude-buffer-names '("*MINIMAP*"))
     :hook
-    (after-init . golden-ratio-mode)
+    (elpaca-after-init . golden-ratio-mode)
     :config
+    ;; Exclude `popper' popups, don't override `popper-window-height'
+    (with-eval-after-load "popper"
+      (add-to-list 'golden-ratio-inhibit-functions
+   		 (lambda ()
+                     (seq-some (lambda (win)
+                                 (popper-popup-p (window-buffer win)))
+                               (window-list)))))
+
     ;; Exclude `which-key' buffer window
     (with-eval-after-load "which-key"
       (add-to-list 'golden-ratio-inhibit-functions
