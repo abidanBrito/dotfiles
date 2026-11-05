@@ -22,6 +22,22 @@
     margin: 0.5rem;
 }
 
+#submap {
+    color: @base;
+    font-size: 18px;
+    border-radius: 0.5rem;
+    margin: 0.5rem;
+    padding: 0 0.84rem 0 0.66rem;
+}
+
+#submap. {
+    background-color: @peach;
+}
+
+#submap. {
+    background-color: @red;
+}
+
 #workspaces button {
     color: @overlay0;
 }
