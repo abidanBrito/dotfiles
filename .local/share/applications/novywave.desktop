@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NovyWave
+GenericName=Waveform Viewer
+Comment=Inspect digital signals
+Exec=/home/abi/.local/bin/novywave
+Icon=/home/abi/.local/share/icons/novywave.png
+StartupWMClass=novywave
+Terminal=false
+Categories=Utility;
