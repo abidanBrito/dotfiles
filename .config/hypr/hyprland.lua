@@ -240,6 +240,9 @@ hl.bind(mainMod .. " + F4", hl.dsp.exec_cmd("~/.scripts/power_menu.sh"))
 -- HDMI monitor menu (rofi)
 hl.bind("SUPER + P", hl.dsp.exec_cmd("~/.scripts/monitor_menu.sh"))
 
+-- Bluetooth menu (bluetui)
+hl.bind("SUPER + B", hl.dsp.exec_cmd("kitty --title bluetui -e bluetui"))
+
 -- Wifi menu (impala)
 hl.bind("SUPER + W", hl.dsp.exec_cmd("kitty --title impala -e impala"))
 
@@ -360,6 +363,12 @@ hl.window_rule({
 hl.window_rule({
     name      = "impala-devices",
     match     = { title = "impala" },
+    tile      = true,
+    workspace = "special:devices",
+})
+hl.window_rule({
+    name      = "bluetui-devices",
+    match     = { title = "bluetui" },
     tile      = true,
     workspace = "special:devices",
 })
