@@ -12,3 +12,6 @@ export BAT_THEME="Nord"
 ### PATH
 . "$HOME/.local/bin/env"
 export PATH="$HOME/.pixi/bin:$PATH"
+
+### Make terminal Emacs the default sudo editor
+export SUDO_EDITOR="emacs -nw"
