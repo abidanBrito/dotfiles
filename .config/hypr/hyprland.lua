@@ -52,9 +52,6 @@ hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
 -- NVidia hardware video acceleration
 hl.env("NVD_BACKEND", "direct")
 
--- This supposedly helps fix flickering artifacts on laptops with NVIDIA GPUs
-hl.env("WLR_NO_HARDWARE_CURSORS", "1")
-
 -- Fix flickering in Electron/CEF apps
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
 
@@ -192,10 +189,10 @@ local mainMod = "ALT"
 -- Master key switch (toggle keybindings on and off)
 -- NOTE(abi): while in the "clean" submap only mainMod + T is live, which
 --            returns to the default (reset) submap.
-hl.define_submap("clean", function()
+hl.define_submap("", function()
     hl.bind(mainMod .. " + T", hl.dsp.submap("reset"))
 end)
-hl.bind(mainMod .. " + T", hl.dsp.submap("clean"))
+hl.bind(mainMod .. " + T", hl.dsp.submap(""))
 
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + SHIFT + RETURN", hl.dsp.exec_cmd(editor))
@@ -205,8 +202,26 @@ hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + W", hl.dsp.window.close())
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exit())
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))          -- was: fullscreen, 1
-hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" })) -- was: fullscreen, 0
+hl.bind(mainMod .. " + F", function()
+    -- NOTE(abi): toggle maximized state for the active window, but since
+    --            terminals default to floating, un-float upon entering
+    --            and restore their float state on exit.
+    local win = hl.get_active_window()
+    if not win then return end
+
+    if win.fullscreen ~= 0 then
+        hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))
+        if win.class == terminalClassName then
+            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+        end
+    else
+        if win.floating then
+            hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+        end
+        hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized" }))
+    end
+end)
+hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
 
 -- Hyprlock
 hl.bind("SUPER + L", hl.dsp.exec_cmd("hyprlock"))
@@ -239,6 +254,23 @@ hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
 hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
+
+-- Move window within the layout with mainMod + SHIFT + vim keys
+hl.bind(mainMod .. " + SHIFT + H", hl.dsp.window.move({ direction = "left" }))
+hl.bind(mainMod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
+hl.bind(mainMod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
+hl.bind(mainMod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
+
+-- Resize submap: mainMod + R to enter, vim keys to resize, ESCAPE/RETURN to exit
+hl.define_submap("", function()
+    hl.bind("H", hl.dsp.window.resize({ x = -40, y = 0 }), { repeating = true })
+    hl.bind("J", hl.dsp.window.resize({ x = 0, y = 40 }), { repeating = true })
+    hl.bind("K", hl.dsp.window.resize({ x = 0, y = -40 }), { repeating = true })
+    hl.bind("L", hl.dsp.window.resize({ x = 40, y = 0 }), { repeating = true })
+    hl.bind("ESCAPE", hl.dsp.submap("reset"))
+    hl.bind("RETURN", hl.dsp.submap("reset"))
+end)
+hl.bind(mainMod .. " + R", hl.dsp.submap(""))
 
 -- Switch workspaces (mainMod + [0-9]) and move active window (mainMod + SHIFT + [0-9])
 for i = 1, 10 do
