@@ -240,6 +240,9 @@ hl.bind(mainMod .. " + F4", hl.dsp.exec_cmd("~/.scripts/power_menu.sh"))
 -- HDMI monitor menu (rofi)
 hl.bind("SUPER + P", hl.dsp.exec_cmd("~/.scripts/monitor_menu.sh"))
 
+-- Display menu (dmitui)
+hl.bind("SUPER + D", hl.dsp.exec_cmd("kitty --title dmitui -e sudo dmitui"))
+
 -- Bluetooth menu (bluetui)
 hl.bind("SUPER + B", hl.dsp.exec_cmd("kitty --title bluetui -e bluetui"))
 
@@ -369,6 +372,12 @@ hl.window_rule({
 hl.window_rule({
     name      = "bluetui-devices",
     match     = { title = "bluetui" },
+    tile      = true,
+    workspace = "special:devices",
+})
+hl.window_rule({
+    name      = "dmitui-devices",
+    match     = { title = "dmitui" },
     tile      = true,
     workspace = "special:devices",
 })
