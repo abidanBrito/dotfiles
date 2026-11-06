@@ -10,12 +10,14 @@ set -euxo pipefail
 # Let's set the number of jobs to something reasonable
 # NOTE(abi): we keep 2 cores free to avoid choking the computer during compilation.
 JOBS=$(nproc --ignore=2)
+
 WORK_DIR="$(mktemp -d)"
+BRANCH="${1:-emacs-31}"
 
 trap "rm -rf \"$WORK_DIR\"" EXIT
 
 # Clone the repo
-git clone --depth 1 --branch emacs-31 git://git.savannah.gnu.org/emacs.git "$WORK_DIR"
+git clone --depth 1 --branch "$BRANCH" git://git.savannah.gnu.org/emacs.git "$WORK_DIR"
 pushd "$WORK_DIR"
 
 # Get essential dependencies
@@ -131,3 +133,5 @@ make -j${JOBS} NATIVE_FULL_AOT=1 \
     && sudo make install
 
 popd
+
+echo "[done] emacs installed to /usr/local/bin/emacs"
