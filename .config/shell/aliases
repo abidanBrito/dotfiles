@@ -27,6 +27,10 @@ alias emt='emacsclient -t -a ""'
 alias vim='nvim'
 alias cat='bat'
 alias lg='lazygit'
+alias lj='lazyjournal'
+alias ldk='lazydocker'
+alias lsh='lazyssh'
+alias st='systemctl-tui'
 alias g='git'
 
 # Misc helpers
