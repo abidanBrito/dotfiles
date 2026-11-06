@@ -22,6 +22,7 @@ local menu              = "rofi -show drun"
 ---- AUTOSTART ----
 -------------------
 hl.on("hyprland.start", function()
+    hl.exec_cmd("systemctl --user start xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal")
     hl.exec_cmd("hyprlock")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("hyprpaper")
@@ -31,6 +32,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("udiskie -t")
     hl.exec_cmd("pasystray --notify=all")
     hl.exec_cmd("emacs --daemon")
+    hl.exec_cmd("dconf load / < ~/.config/hypr/gtk-settings.dconf")
     hl.exec_cmd("thunar --daemon")
     hl.exec_cmd("~/.scripts/battery_watch.sh")
 end)
@@ -63,6 +65,9 @@ hl.env("QT_QPA_PLATFORM", "wayland")
 
 -- Prevent Qt apps from drawing their own window decorations
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+
+-- Apply qt5ct/qt6ct theming (Catppuccin Macchiato palette)
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 
 -- Make all Firefox clones run natively instead of through XWayland
 hl.env("MOZ_ENABLE_WAYLAND", "1")

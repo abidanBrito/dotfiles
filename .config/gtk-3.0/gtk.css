@@ -1,0 +1,6 @@
+/* Fix for KiCad painting white-ish panel/toolbar backgrounds.
+   Catppuccin omits background-color on button (wxWidgets), so the deprecated GTK3 color API returns wrong values. */
+button {
+    background-color: #363a4f;
+    color: #cad3f5;
+}

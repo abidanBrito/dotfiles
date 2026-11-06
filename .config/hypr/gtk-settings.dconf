@@ -1,0 +1,3 @@
+[org/gnome/desktop/interface]
+gtk-theme='catppuccin-macchiato-peach-standard+default'
+color-scheme='prefer-dark'
