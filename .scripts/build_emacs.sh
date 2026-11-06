@@ -18,7 +18,7 @@ pushd emacs
 git pull
 
 # Get essential dependencies
-sudo pacman -S --needed \
+sudo pacman -S --needed --noconfirm \
      base-devel \
      texinfo \
      gnutls \
@@ -38,25 +38,25 @@ sudo pacman -S --needed \
      cairo
 
 # Get Wayland-specific dependencies
-sudo pacman -S --needed \
+sudo pacman -S --needed --noconfirm \
      wayland \
      wayland-protocols \
      gtk-layer-shell
 
 # Get dependencies for gcc and the build process
-sudo pacman -S --needed \
+sudo pacman -S --needed --noconfirm \
      gcc \
      libgccjit \
      autoconf
 
 # Get GNU Mailutils (protocol-independent mail framework)
-sudo pacman -S --needed mailutils
+sudo pacman -S --needed --noconfirm mailutils
 
 # Get the tree-sitter syntax parsing engine
-sudo pacman -S --needed tree-sitter
+sudo pacman -S --needed --noconfirm tree-sitter
 
 # Get an OpenType font shaping engine (for ligatures)
-sudo pacman -S --needed harfbuzz
+sudo pacman -S --needed --noconfirm harfbuzz
 
 # Use system GCC
 # NOTE(abi): needed when compiling with libgccjit or we'll get cryptic error messages.
