@@ -255,6 +255,9 @@ hl.bind("SUPER + W", hl.dsp.exec_cmd("kitty --title impala -e impala"))
 -- Pavucontrol
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("pavucontrol"))
 
+-- Audio output menu (pactl)
+hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("~/.scripts/menus/audio_menu.sh"))
+
 -- Temporary emacs frame for text input
 hl.bind(mainMod .. " + SHIFT + I", hl.dsp.exec_cmd("emacsclient --eval '(abi/quick-text-input)'"))
 
