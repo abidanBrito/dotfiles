@@ -1,6 +1,6 @@
 # dotfiles
 
-> Personal configuration files for my Linux setup, managed with [GNU Stow](https://www.gnu.org/software/stow/). Following the [Catppuccin Mocha](https://github.com/catppuccin/catppuccin) color scheme.
+> Personal configuration files for my Linux setup, managed with [GNU Stow](https://www.gnu.org/software/stow/). Following the [Catppuccin Macchiato](https://github.com/catppuccin/catppuccin) color scheme.
 
 ---
 
