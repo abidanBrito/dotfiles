@@ -34,7 +34,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("emacs --daemon")
     hl.exec_cmd("dconf load / < ~/.config/hypr/gtk-settings.dconf")
     hl.exec_cmd("thunar --daemon")
-    hl.exec_cmd("~/.scripts/battery_watch.sh")
+    hl.exec_cmd("~/.scripts/daemon/battery_watcher.sh")
+    hl.exec_cmd("clipse -listen")
 end)
 
 -------------------------------
@@ -205,7 +206,7 @@ hl.bind(mainMod .. " + CTRL + RETURN", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + W", hl.dsp.window.close())
-hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exit())
+hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F", function()
     -- NOTE(abi): toggle maximized state for the active window, but since
@@ -237,11 +238,17 @@ hl.bind("SUPER + S", hl.dsp.exec_cmd("~/.scripts/menus/screenshot_menu.sh"))
 -- Hyprshade
 hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("hyprshade toggle"))
 
+-- Notification panel (swaync)
+hl.bind("SUPER + N", hl.dsp.exec_cmd("swaync-client -t"))
+
 -- Power menu (rofi)
-hl.bind(mainMod .. " + F4", hl.dsp.exec_cmd("~/.scripts/power_menu.sh"))
+hl.bind(mainMod .. " + F4", hl.dsp.exec_cmd("~/.scripts/menus/power_menu.sh"))
 
 -- HDMI monitor menu (rofi)
-hl.bind("SUPER + P", hl.dsp.exec_cmd("~/.scripts/monitor_menu.sh"))
+hl.bind("SUPER + P", hl.dsp.exec_cmd("~/.scripts/menus/monitor_menu.sh"))
+
+-- Clipboard manager (clipse)
+hl.bind("SUPER + C", hl.dsp.exec_cmd("kitty --title clipse -e clipse"))
 
 -- Display menu (dmitui)
 hl.bind("SUPER + D", hl.dsp.exec_cmd("kitty --title dmitui -e sudo dmitui"))
@@ -252,8 +259,8 @@ hl.bind("SUPER + B", hl.dsp.exec_cmd("kitty --title bluetui -e bluetui"))
 -- Wifi menu (impala)
 hl.bind("SUPER + W", hl.dsp.exec_cmd("kitty --title impala -e impala"))
 
--- Pavucontrol
-hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("pavucontrol"))
+-- Audio mixer (wiremix)
+hl.bind("SUPER + A", hl.dsp.exec_cmd("kitty --title wiremix -e wiremix"))
 
 -- Audio output menu (pactl)
 hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("~/.scripts/menus/audio_menu.sh"))
@@ -348,6 +355,14 @@ hl.window_rule({
 })
 
 hl.window_rule({
+    name   = "float-clipse",
+    match  = { title = "clipse" },
+    float  = true,
+    size   = "1200 600",
+    center = true,
+})
+
+hl.window_rule({
     name  = "float-mpv",
     match = { class = "mpv" },
     float = true,
@@ -388,8 +403,19 @@ hl.window_rule({
     workspace = "special:devices",
 })
 hl.window_rule({
+    name      = "wiremix-devices",
+    match     = { title = "wiremix" },
+    tile      = true,
+    workspace = "special:devices",
+})
+hl.window_rule({
     name      = "dmitui-devices",
     match     = { title = "dmitui" },
     tile      = true,
     workspace = "special:devices",
 })
+
+-- Layer rules
+hl.layer_rule({ match = { namespace = "rofi" }, blur = true, xray = false, ignore_alpha = 0.85 })
+hl.layer_rule({ match = { namespace = "swaync-notification-window" }, blur = true, xray = false, ignore_alpha = 0.05 })
+hl.layer_rule({ match = { namespace = "swaync-control-center" }, blur = true, xray = false, ignore_alpha = 0.05 })
