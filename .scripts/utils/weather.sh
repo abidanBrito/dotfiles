@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# This script prints wttr.in weather as JSON for the waybar weather module.
+
+## Author: Abidán Brito
+## This script prints wttr.in weather as JSON for the waybar weather module.
 
 location="$1"
 attempts=5

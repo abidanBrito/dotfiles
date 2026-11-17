@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## Author: Abidán Brito
+## This script sends low battery notifications and suspends at 3% charge.
+
 WARNED_20=false
 WARNED_15=false
 WARNED_10=false

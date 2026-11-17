@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+## Author: Abidán Brito
+## This script mirrors or extends the HDMI monitor from a rofi menu.
+
 # Present options to the user through wofi
 op=$( echo -e "󰍺  Mirror\n󱄴  Extend" | rofi -dmenu -i -p "Monitor" | awk '{print $NF}' )
 

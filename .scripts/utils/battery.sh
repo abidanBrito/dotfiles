@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# This script prints battery status and the TLP profile as JSON for waybar.
+
+## Author: Abidán Brito
+## This script prints battery status and the TLP profile as JSON for waybar.
 
 # Raw battery readings from sysfs
 bat=/sys/class/power_supply/BAT1
