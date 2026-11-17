@@ -1,0 +1,29 @@
+:root {
+  --cc-bg: rgba(24, 24, 37, 0.9);
+  --noti-border-color: rgba(69, 71, 90, 0.5);
+  --noti-bg: 49, 50, 68;
+  --noti-bg-alpha: 0.9;
+  --noti-bg-darker: rgb(24, 24, 37);
+  --noti-bg-hover: rgb(69, 71, 90);
+  --noti-bg-focus: rgba(88, 91, 112, 0.6);
+  --noti-close-bg: rgba(69, 71, 90, 0.5);
+  --noti-close-bg-hover: rgba(88, 91, 112, 0.8);
+  --text-color: rgb(205, 214, 244);
+  --text-color-disabled: rgb(166, 173, 200);
+  --bg-selected: rgb(180, 190, 254);
+  --overlay2: rgb(147, 153, 178);
+}
+
+@define-color cc-bg rgba(24, 24, 37, 0.9);
+@define-color noti-border-color rgba(69, 71, 90, 0.5);
+@define-color noti-bg rgba(49, 50, 68, 0.9);
+@define-color noti-bg-opaque rgb(49, 50, 68);
+@define-color noti-bg-darker rgb(24, 24, 37);
+@define-color noti-bg-hover rgb(69, 71, 90);
+@define-color noti-bg-hover-opaque rgb(69, 71, 90);
+@define-color noti-bg-focus rgba(88, 91, 112, 0.6);
+@define-color noti-close-bg rgba(69, 71, 90, 0.5);
+@define-color noti-close-bg-hover rgba(88, 91, 112, 0.8);
+@define-color text-color rgb(205, 214, 244);
+@define-color text-color-disabled rgb(166, 173, 200);
+@define-color bg-selected rgb(180, 190, 254);
