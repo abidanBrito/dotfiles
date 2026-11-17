@@ -1,6 +1,6 @@
 /* style.css */
 
-@import "mocha.css"; 
+@import "themes/macchiato.css";
 
 * {
     font-family: CaskaydiaCove Nerd Font;
@@ -9,15 +9,32 @@
     min-height: 0;
 }
 
-#waybar {
-    background-color: @surface0;
-    color: @overlay0;
+tooltip {
+    background-color: @base;
+    border: 2px solid @overlay2;
+    border-radius: 0.5rem;
+}
+
+tooltip label {
+    color: @text;
+}
+
+/* Transparent window avoids square corners; style the inner box instead. */
+window#waybar {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+window#waybar > box {
+    background-color: @base;
+    color: @text;
     border: 2px solid @overlay2;
     border-radius: 0.75rem;
 }
 
 #workspaces {
-    background-color: @surface1;
+    background-color: @mantle;
     border-radius: 0.5rem;
     margin: 0.5rem;
 }
@@ -39,20 +56,26 @@
 }
 
 #workspaces button {
-    color: @overlay0;
+    color: @subtext0;
+    background-color: @surface0;
+    min-width: 1.5rem;
+    padding: 0.25rem;
+    margin: 0.25rem;
+    border-radius: 0.35rem;
 }
 
 #workspaces button.active {
-    color: @peach;
+    color: @base;
+    background-color: @peach;
 }
 
 #tray,
 #clock,
-#battery,
+#custom-battery,
 #pulseaudio,
 #network,
 #custom-weather {
-    background-color: @surface1;
+    background-color: @surface0;
     padding: 0 0.5rem;
     margin: 0.5rem;
 }
@@ -68,17 +91,18 @@
     padding-right: 1rem;
 }
 
-#battery {
+#custom-battery {
     color: @green;
     margin: 0.5rem 0;
     padding-right: 1rem;
 }
 
-#battery.charging {
+#custom-battery.charging {
     color: @green;
 }
 
-#battery.warning:not(.charging) {
+#custom-battery.warning,
+#custom-battery.critical {
     color: @red;
 }
 
@@ -97,4 +121,19 @@
 #custom-weather {
     color: @lavender;
     border-radius: 0.5rem;
+}
+
+/* Power profile popup menu */
+menu {
+    padding: 0.25rem 0;
+}
+
+menu menuitem {
+    padding: 0.3rem 0.5rem;
+    min-width: 0;
+}
+
+menu menuitem label {
+    margin: 0;
+    padding: 0;
 }

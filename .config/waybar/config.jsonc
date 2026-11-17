@@ -8,14 +8,18 @@
     "margin-right": 4,
     "modules-left": ["custom/weather", "hyprland/workspaces", "hyprland/submap"],
     "modules-center": ["hyprland/window"],
-    "modules-right": ["tray", "clock", "battery", "pulseaudio", "network"],
+    "modules-right": ["tray", "clock", "custom/battery", "pulseaudio", "network"],
 
     "custom/weather": {
-	"exec": "~/.scripts/weather.sh Puerto+del+Rosario+Spain",
+	"exec": "~/.scripts/utils/weather.sh Puerto+del+Rosario+Spain",
 	"return-type": "json",
 	"format": "{}",
 	"tooltip": true,
 	"interval": 1800
+    },
+
+    "hyprland/workspaces": {
+	"on-click": "activate"
     },
 
     "hyprland/window": {
@@ -45,21 +49,25 @@
 		"months": "",
 		"weekdays": "<b>{}</b>",
 		"days": "<b>{}</b>",
-		"today": "<span color='#ffcc66'><b>{}</b></span>"
+		"today": "<span color='#eed49f'><b>{}</b></span>"
 	    }
 	}
     },
 
-    "battery": {
-	"states": {
-	    "warning": 30,
-	    "critical": 15
-	},
-	"format": "{icon} {capacity}%",
-	"format-alt": "{icon} {time}",
-	"format-charging": "󰂄 {capacity}%",
-	"format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
-	"tooltip-format": "{time}"
+    "custom/battery": {
+	"exec": "~/.scripts/utils/battery.sh",
+	"return-type": "json",
+	"format": "{text}",
+	"format-alt": "{alt}",
+	"interval": 30,
+	"signal": 8,
+	"menu": "on-click-right",
+	"menu-file": "~/.config/waybar/power_menu.xml",
+	"menu-actions": {
+	    "performance": "sudo -n tlp performance && pkill -RTMIN+8 waybar && notify-send 'Power profile' 'Performance'",
+	    "balanced": "sudo -n tlp balanced && pkill -RTMIN+8 waybar && notify-send 'Power profile' 'Balanced'",
+	    "power-saver": "sudo -n tlp power-saver && pkill -RTMIN+8 waybar && notify-send 'Power profile' 'Power Saver'"
+	}
     },
 
     "network": {
@@ -77,14 +85,18 @@
     },
 
     "pulseaudio": {
-	"format": "{icon} {volume}%",
+	"format": " {volume}%",
+	"format-alt": "{icon}",
 	"format-muted": " {volume}%",
 	"format-bluetooth": "󰂱 {volume}%",
 	"format-icons": {
-	    "default": ""
+	    "speaker": "󰓃 Speakers",
+	    "headphone": "󰋋 Headphones",
+	    "headset": "󰋎 Headset",
+	    "hdmi": "󰡁 HDMI",
+	    "default": " Output"
 	},
 	"ignored-sinks": ["Easy Effects Sink"],
-	"on-click": "pavucontrol",
 	"scroll-step": 1
     },
 }
