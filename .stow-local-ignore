@@ -1,3 +1,9 @@
 # GNU Stow ignore list
 
-^/keymaps
+^/LICENSE$
+^/README\.md$
+^/\.luarc\.json$
+^/keymaps$
+
+# Zen theme sources are deployed by theme.sh into ~/.zen, not stowed
+^/\.config/zen$
