@@ -1,6 +1,6 @@
 // config.rasi 
 
-@import "catppuccin-mocha"
+@import "themes/macchiato"
 
 configuration {
     font: "FantasqueSansMono Nerd Font 16";
@@ -36,7 +36,8 @@ window {
 }
 
 mainbox {
-    border-color: @surface1;
+    background-color: @base-alpha;
+    border-color: @overlay2;
     border-radius: 15;
     border: 2px solid;
     padding: 10px;
@@ -44,6 +45,7 @@ mainbox {
 }
 
 listview {
+    background-color: transparent;
     scrollbar: false;
     border: none;
     spacing: 0;
@@ -51,7 +53,7 @@ listview {
 }
 
 inputbar {
-    background-color: @surface1;
+    background-color: @surface1-alpha;
     border-radius: 10px;
     margin: 0 0 10px 0;
     children: [prompt, entry];

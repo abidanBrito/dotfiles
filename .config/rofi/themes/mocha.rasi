@@ -24,6 +24,9 @@
   surface2: #585b70;
   surface1: #45475a;
   surface0: #313244;
+  base-alpha: rgba(30, 30, 46, 0.90);
+  surface0-alpha: rgba(49, 50, 68, 0.90);
+  surface1-alpha: rgba(69, 71, 90, 0.90);
   base: #1e1e2e;
   mantle: #181825;
   crust: #11111b;
