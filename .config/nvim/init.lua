@@ -69,5 +69,7 @@ config.setup({
 })
 
 -- Color theme
-require("catppuccin").setup()
+require("catppuccin").setup({
+  flavour = "macchiato",
+})
 vim.cmd.colorscheme "catppuccin"
