@@ -1,6 +1,6 @@
 -- hyprland.lua
 
-local mocha = require("mocha")
+local palette = require("themes.macchiato")
 
 ------------------
 ---- MONITORS ----
@@ -84,8 +84,8 @@ hl.config({
         gaps_out         = 6,
         border_size      = 2,
         col              = {
-            active_border   = mocha.peach,
-            inactive_border = mocha.overlay2,
+            active_border   = palette.peach,
+            inactive_border = palette.overlay2,
         },
         resize_on_border = false,
         allow_tearing    = false,
