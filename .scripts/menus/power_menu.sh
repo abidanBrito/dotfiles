@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-op=$( echo -e "  Poweroff\n  Reboot\n  Suspend\n  Lock\n  Logout" | rofi -dmenu -i | awk '{print tolower($2)}' )
+op=$( echo -e "  Poweroff\n  Reboot\n  Suspend\n  Lock\n  Logout" | rofi -dmenu -i -p "Power" | awk '{print tolower($2)}' )
 
 case $op in 
         poweroff)
@@ -14,6 +14,6 @@ case $op in
                 hyprctl dispatch lock
                 ;;
         logout)
-                hyprctl dispatch exit
+                hyprctl dispatch 'hl.dsp.exit()'
                 ;;
 esac

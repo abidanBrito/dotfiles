@@ -11,19 +11,19 @@ while true; do
 
   if [ "$STATUS" = "Discharging" ]; then
     if [ "$BATTERY" -le 3 ]; then
-      notify-send -u critical "🪫 CRITICAL Battery" "${BATTERY}% — suspending now!" -t 0
+      notify-send -u critical "🪫 Battery: critical (${BATTERY}%)" -t 0
       systemctl suspend
     elif [ "$BATTERY" -le 5 ] && [ "$WARNED_5" = false ]; then
-      notify-send -u critical "🔋 Battery Critical" "${BATTERY}% remaining — plug in NOW!" -t 0
+      notify-send -u critical "🔋 Battery: critical (${BATTERY}%)" -t 0
       WARNED_5=true
     elif [ "$BATTERY" -le 10 ] && [ "$WARNED_10" = false ]; then
-      notify-send -u critical "🔋 Battery Very Low" "${BATTERY}% remaining" -t 15000
+      notify-send -u critical "🔋 Battery: very low (${BATTERY}%)" -t 10000
       WARNED_10=true
     elif [ "$BATTERY" -le 15 ] && [ "$WARNED_15" = false ]; then
-      notify-send -u normal "🔋 Battery Low" "${BATTERY}% remaining" -t 10000
+      notify-send -u normal "🔋 Battery: low (${BATTERY}%)"
       WARNED_15=true
     elif [ "$BATTERY" -le 20 ] && [ "$WARNED_20" = false ]; then
-      notify-send -u normal "🔋 Battery Low" "${BATTERY}% remaining" -t 8000
+      notify-send -u normal "🔋 Battery: low (${BATTERY}%)"
       WARNED_20=true
     fi
   else
