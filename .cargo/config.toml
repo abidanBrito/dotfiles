@@ -1,0 +1,4 @@
+# Global cargo settings.
+
+[build]
+jobs = 4
