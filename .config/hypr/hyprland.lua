@@ -232,9 +232,7 @@ hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen({ mode = "fullscreen
 hl.bind("SUPER + L", hl.dsp.exec_cmd("hyprlock"))
 
 -- Hyprshot
-hl.bind("PRINT", hl.dsp.exec_cmd("hyprshot -m active -m output"))
-hl.bind("SHIFT + PRINT", hl.dsp.exec_cmd("hyprshot -m active -m window"))
-hl.bind(mainMod .. " + PRINT", hl.dsp.exec_cmd("hyprshot -m region"))
+hl.bind("SUPER + S", hl.dsp.exec_cmd("~/.scripts/menus/screenshot_menu.sh"))
 
 -- Hyprshade
 hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("hyprshade toggle"))
