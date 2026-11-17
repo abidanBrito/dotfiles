@@ -261,6 +261,9 @@ hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("~/.scripts/menus/audio_menu.sh"))
 -- Emoji picker
 hl.bind("SUPER + E", hl.dsp.exec_cmd("~/.scripts/menus/emoji_menu.sh"))
 
+-- Color picker (hyprpicker)
+hl.bind("SUPER + K", hl.dsp.exec_cmd("~/.scripts/menus/color_picker.sh"))
+
 -- Temporary emacs frame for text input
 hl.bind(mainMod .. " + SHIFT + I", hl.dsp.exec_cmd("emacsclient --eval '(abi/quick-text-input)'"))
 
